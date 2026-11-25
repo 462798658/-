@@ -66,12 +66,17 @@ export default function Admin() {
   const [hwError, setHwError] = useState('')
   const [pendingMode, setPendingMode] = useState(null)
 
-  const [readingMin, setReadingMin] = useState(String(state.readingConfig.minMinutes))
+  const [readingForm, setReadingForm] = useState({
+    minMinutes: String(state.readingConfig.minMinutes),
+    points: String(state.readingConfig.points),
+  })
   const [readingError, setReadingError] = useState('')
 
   const [calcForm, setCalcForm] = useState({
     dailyLimit: String(state.calcConfig.dailyLimit),
     perSubmit: String(state.calcConfig.perSubmit),
+    pointsPerPage: String(state.calcConfig.pointsPerPage),
+    neatBonus: String(state.calcConfig.neatBonus),
   })
   const [calcError, setCalcError] = useState('')
 
@@ -191,13 +196,13 @@ export default function Admin() {
   }
 
   const submitReading = () => {
-    const res = saveReadingConfig(readingMin)
+    const res = saveReadingConfig(readingForm)
     if (!res.ok) {
       setReadingError(res.message)
       return
     }
     setReadingError('')
-    toast(`阅读最少时长已更新为 ${readingMin} 分钟，学员端实时生效`, 'success')
+    toast(`阅读规则已保存：每次打卡 +${readingForm.points} 积分，学员端实时生效`, 'success')
   }
 
   const submitCalc = () => {
@@ -404,22 +409,32 @@ export default function Admin() {
           <div className="admin-panel-head">
             <div>
               <h2>阅读打卡设置</h2>
-              <p>调整学员单次阅读打卡的最少学习时长</p>
+              <p>设置最少学习时长与每次打卡的积分奖励</p>
             </div>
           </div>
-          <Field label="单次最少时长（分钟）" hint="正整数，范围 1-600，保存后倒计时与提交校验实时更新" error={readingError}>
+          <Field label="单次最少时长（分钟）" hint="正整数，范围 1-600，保存后倒计时与提交校验实时更新">
             <input
               type="number"
               min="1"
               max="600"
-              value={readingMin}
-              onChange={(e) => setReadingMin(e.target.value)}
+              value={readingForm.minMinutes}
+              onChange={(e) => setReadingForm((r) => ({ ...r, minMinutes: e.target.value }))}
             />
           </Field>
+          <Field label="每次打卡积分奖励" hint="整数，范围 0-1000；设为 0 可关闭阅读积分奖励">
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              value={readingForm.points}
+              onChange={(e) => setReadingForm((r) => ({ ...r, points: e.target.value }))}
+            />
+          </Field>
+          {readingError ? <p className="form-error">{readingError}</p> : null}
           <div className="admin-preview">
             <BookOpen size={16} />
             <span>
-              学员需累计学习 <b>{readingMin || '—'} 分钟</b> 后方可提交阅读打卡
+              学员需累计学习 <b>{readingForm.minMinutes || '—'} 分钟</b>，完成后获得 <b>+{readingForm.points || '0'} 积分</b>
             </span>
           </div>
           <button className="btn btn-primary full" onClick={submitReading}>
@@ -433,7 +448,7 @@ export default function Admin() {
           <div className="admin-panel-head">
             <div>
               <h2>计算打卡设置</h2>
-              <p>设置每日页数上限与单次提交页数</p>
+              <p>设置页数上限、每页基础积分与字迹工整奖励</p>
             </div>
           </div>
           <Field label="每日计算打卡页数上限" hint="正整数，范围 1-100">
@@ -454,11 +469,29 @@ export default function Admin() {
               onChange={(e) => setCalcForm((c) => ({ ...c, perSubmit: e.target.value }))}
             />
           </Field>
+          <Field label="每页基础积分" hint="整数，范围 0-1000；按本次提交页数累计发放">
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              value={calcForm.pointsPerPage}
+              onChange={(e) => setCalcForm((c) => ({ ...c, pointsPerPage: e.target.value }))}
+            />
+          </Field>
+          <Field label="字迹工整额外奖励" hint="整数，范围 0-1000；仅审核通过且字迹工整时发放">
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              value={calcForm.neatBonus}
+              onChange={(e) => setCalcForm((c) => ({ ...c, neatBonus: e.target.value }))}
+            />
+          </Field>
           {calcError ? <p className="form-error">{calcError}</p> : null}
           <div className="admin-preview">
             <Calculator size={16} />
             <span>
-              学员每日最多打卡 <b>{calcForm.dailyLimit || '—'} 页</b>，单次最多提交 <b>{calcForm.perSubmit || '—'} 页</b>
+              每日 <b>{calcForm.dailyLimit || '—'} 页</b>、单次 <b>{calcForm.perSubmit || '—'} 页</b>；每页 <b>+{calcForm.pointsPerPage || '0'}</b>，字迹工整额外 <b>+{calcForm.neatBonus || '0'}</b>
             </span>
           </div>
           <button className="btn btn-primary full" onClick={submitCalc}>

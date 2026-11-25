@@ -69,7 +69,7 @@ export default function CheckinHub() {
           <span className="entry-tags">
             <em>每日 1 次</em>
             <em>≥ {readingConfig.minMinutes} 分钟</em>
-            <em>+15 积分</em>
+            <em>+{readingConfig.points} 积分</em>
           </span>
         </span>
         <span className={`entry-cta ${readingDone ? 'ghost' : ''}`}>
@@ -93,7 +93,7 @@ export default function CheckinHub() {
           <span className="entry-tags">
             <em>单次 {calcConfig.perSubmit} 页</em>
             <em>AI 审核字迹</em>
-            <em>+5 积分/页</em>
+            <em>+{calcConfig.pointsPerPage} 积分/页</em>
           </span>
         </span>
         <span className={`entry-cta ${calcDone ? 'ghost' : ''}`}>

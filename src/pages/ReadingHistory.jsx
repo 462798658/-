@@ -4,6 +4,7 @@ import { useApp } from '../state/AppContext'
 import { Badge, EmptyState, PageHeader, Sheet } from '../components/ui'
 import { formatDateCN, weekdayCN } from '../lib/utils'
 import { getMediaUrl } from '../lib/media'
+import { POINTS } from '../lib/domain'
 
 const SAMPLE_VIDEO = `${import.meta.env.BASE_URL}sample-reading.mp4`
 
@@ -43,6 +44,7 @@ export default function ReadingHistory() {
   }, [active])
 
   const totalMinutes = Math.round(records.reduce((s, r) => s + r.durationSec, 0) / 60)
+  const totalPoints = records.reduce((s, r) => s + (r.points ?? POINTS.reading), 0)
   const groups = []
   records.forEach((r) => {
     const key = r.date.slice(0, 7)
@@ -72,7 +74,7 @@ export default function ReadingHistory() {
         <div className="history-divider" />
         <div>
           <span>获得积分</span>
-          <b>{records.length * 15}</b>
+          <b>{totalPoints}</b>
         </div>
       </div>
 
@@ -99,7 +101,7 @@ export default function ReadingHistory() {
                       学习 {Math.round(r.durationSec / 60)} 分钟 · {r.mode === 'record' ? '录制视频' : '观看视频'}
                     </span>
                   </span>
-                  <Badge tone="primary">+15</Badge>
+                  <Badge tone="primary">+{r.points ?? POINTS.reading}</Badge>
                 </button>
               ))}
             </div>
@@ -144,7 +146,7 @@ export default function ReadingHistory() {
               </div>
               <div>
                 <span>获得积分</span>
-                <b>+15</b>
+                <b>+{active.points ?? POINTS.reading}</b>
               </div>
             </div>
           </div>

@@ -137,8 +137,18 @@ export const makeDefaultHomeworkConfig = () => ({
   updatedAt: new Date().toISOString(),
 })
 
-export const makeDefaultReadingConfig = () => ({ minMinutes: 30, updatedAt: new Date().toISOString() })
-export const makeDefaultCalcConfig = () => ({ dailyLimit: 2, perSubmit: 1, updatedAt: new Date().toISOString() })
+export const makeDefaultReadingConfig = () => ({
+  minMinutes: 30,
+  points: POINTS.reading,
+  updatedAt: new Date().toISOString(),
+})
+export const makeDefaultCalcConfig = () => ({
+  dailyLimit: 2,
+  perSubmit: 1,
+  pointsPerPage: POINTS.calcPerPage,
+  neatBonus: POINTS.neatBonus,
+  updatedAt: new Date().toISOString(),
+})
 
 export function homeworkProgress(config, totalPages) {
   const target = config.totalPages

@@ -15,7 +15,6 @@ import {
 import { useApp } from '../state/AppContext'
 import { Badge, Modal, PageHeader, ProgressBar, Sheet } from '../components/ui'
 import { putMedia } from '../lib/media'
-import { POINTS } from '../lib/domain'
 import { formatDateTime, todayKey, uid } from '../lib/utils'
 
 export default function CalcCheckin() {
@@ -127,7 +126,7 @@ export default function CalcCheckin() {
       <PageHeader
         title="计算打卡"
         subtitle="拍照上传计算作业，AI 智能审核字迹"
-        right={<Badge tone="sky">+{POINTS.calcPerPage} 积分/页</Badge>}
+        right={<Badge tone="sky">+{calcConfig.pointsPerPage} 积分/页</Badge>}
       />
 
       <div className="limit-card card">
@@ -195,7 +194,7 @@ export default function CalcCheckin() {
             </div>
             <p className="upload-tip">
               <Sparkles size={13} />
-              AI 将识别作业字迹与对错，字迹工整清晰额外 +{POINTS.neatBonus} 积分
+              AI 将识别作业字迹与对错，字迹工整清晰额外 +{calcConfig.neatBonus} 积分
             </p>
           </div>
 
@@ -295,7 +294,7 @@ export default function CalcCheckin() {
               </div>
               <div>
                 <span>字迹工整</span>
-                <b>{result.passed ? (result.neat ? '清晰 · 奖励 +1' : '良好') : '不通过'}</b>
+                <b>{result.passed ? (result.neat ? `清晰 · 奖励 +${result.record.neatBonus}` : '良好') : '不通过'}</b>
               </div>
               <div>
                 <span>今日已打卡</span>

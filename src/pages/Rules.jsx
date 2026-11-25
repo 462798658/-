@@ -2,7 +2,7 @@ import React from 'react'
 import { BookOpen, Calculator, Coins, Gift, LockKeyhole, RefreshCcw, ScrollText, Sparkles, Target } from 'lucide-react'
 import { useApp } from '../state/AppContext'
 import { Badge, PageHeader } from '../components/ui'
-import { homeworkProgress, POINTS } from '../lib/domain'
+import { homeworkProgress } from '../lib/domain'
 import { formatDateTime } from '../lib/utils'
 
 export default function Rules() {
@@ -48,7 +48,7 @@ export default function Rules() {
           </li>
           <li>
             <span>积分奖励</span>
-            <b>+{POINTS.reading} 积分 / 次</b>
+            <b>+{readingConfig.points} 积分 / 次</b>
           </li>
         </ul>
         <p className="rule-note">学习时长达到 {readingConfig.minMinutes} 分钟后才可提交，当日不可重复打卡。</p>
@@ -75,11 +75,11 @@ export default function Rules() {
           </li>
           <li>
             <span>基础积分</span>
-            <b>+{POINTS.calcPerPage} 积分 / 页</b>
+            <b>+{calcConfig.pointsPerPage} 积分 / 页</b>
           </li>
           <li>
             <span>字迹工整奖励</span>
-            <b>额外 +{POINTS.neatBonus} 积分</b>
+            <b>额外 +{calcConfig.neatBonus} 积分</b>
           </li>
         </ul>
         <p className="rule-note">单次提交页数不得超过每日上限，超出后当日不可继续打卡；审核未通过不发放字迹奖励。</p>

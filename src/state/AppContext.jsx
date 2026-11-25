@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { createSeedState, STORAGE_KEY } from '../lib/seed'
 import {
   isGiftUnlocked,
+  makeDefaultCalcConfig,
+  makeDefaultReadingConfig,
   validateHomeworkForm,
   validateLadderForm,
   POINTS,
@@ -23,7 +25,11 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed && parsed.version === 1) return parsed
+      if (parsed && parsed.version === 1) {
+        parsed.readingConfig = { ...makeDefaultReadingConfig(), ...(parsed.readingConfig || {}) }
+        parsed.calcConfig = { ...makeDefaultCalcConfig(), ...(parsed.calcConfig || {}) }
+        return parsed
+      }
     }
   } catch {
     // ignore broken cache
@@ -39,7 +45,7 @@ function loadState() {
 
 function addPoints(draft, userId, delta, type, label, refId) {
   const user = draft.users.find((u) => u.id === userId)
-  if (!user) return
+  if (!user || delta === 0) return
   user.points = Math.max(0, user.points + delta)
   draft.pointsLogs.unshift({
     id: uid('pl'),
@@ -220,6 +226,7 @@ export function AppProvider({ children }) {
     if (state.readingCheckins.some((r) => r.userId === user.id && r.date === today)) {
       return { ok: false, message: '今日已完成阅读打卡，明天再来吧' }
     }
+    const reward = state.readingConfig.points ?? POINTS.reading
     const draft = structuredClone(state)
     const record = {
       id: uid('rd'),
@@ -228,14 +235,15 @@ export function AppProvider({ children }) {
       durationSec: Math.round(durationSec),
       mediaId: mediaId || null,
       mode: mode || 'watch',
+      points: reward,
       createdAt: nowISO(),
     }
     draft.readingCheckins.unshift(record)
-    addPoints(draft, user.id, POINTS.reading, 'reading', '阅读打卡', record.id)
+    addPoints(draft, user.id, reward, 'reading', '阅读打卡', record.id)
     const unlocks = recomputeProgress(draft, user.id)
     setState(draft)
     notifyUnlocks(unlocks)
-    return { ok: true, points: POINTS.reading, record, unlocks }
+    return { ok: true, points: reward, record, unlocks }
   }
 
   const completeCalc = ({ pages, images, review, neatBonus, accuracy }) => {
@@ -254,7 +262,9 @@ export function AppProvider({ children }) {
 
     const passed = review === 'passed'
     const neat = passed && !!neatBonus
-    const earned = pages * POINTS.calcPerPage + (neat ? POINTS.neatBonus : 0)
+    const perPagePoints = state.calcConfig.pointsPerPage ?? POINTS.calcPerPage
+    const neatPoints = state.calcConfig.neatBonus ?? POINTS.neatBonus
+    const earned = pages * perPagePoints + (neat ? neatPoints : 0)
     const draft = structuredClone(state)
     const record = {
       id: uid('cc'),
@@ -263,14 +273,14 @@ export function AppProvider({ children }) {
       pages,
       images,
       review,
-      neatBonus: neat ? POINTS.neatBonus : 0,
+      neatBonus: neat ? neatPoints : 0,
       accuracy: accuracy || null,
       points: earned,
       createdAt: nowISO(),
     }
     draft.calcCheckins.unshift(record)
-    addPoints(draft, user.id, pages * POINTS.calcPerPage, 'calc', '计算打卡', record.id)
-    if (neat) addPoints(draft, user.id, POINTS.neatBonus, 'handwriting', '字迹奖励', record.id)
+    addPoints(draft, user.id, pages * perPagePoints, 'calc', '计算打卡', record.id)
+    if (neat) addPoints(draft, user.id, neatPoints, 'handwriting', '字迹奖励', record.id)
     const unlocks = recomputeProgress(draft, user.id)
     setState(draft)
     notifyUnlocks(unlocks)
@@ -517,24 +527,33 @@ export function AppProvider({ children }) {
   }
 
   // ---------- admin configs ----------
-  const saveReadingConfig = (minMinutes) => {
+  const saveReadingConfig = ({ minMinutes, points }) => {
     if (!user || user.role !== 'admin') return { ok: false, message: '无权限修改规则' }
     if (!isIntInRange(minMinutes, 1, 600)) return { ok: false, message: '最少时长需为 1-600 的正整数' }
+    if (!isIntInRange(points, 0, 1000)) return { ok: false, message: '每次打卡积分需为 0-1000 的整数' }
     const draft = structuredClone(state)
-    draft.readingConfig = { minMinutes: Number(minMinutes), updatedAt: nowISO() }
+    draft.readingConfig = {
+      minMinutes: Number(minMinutes),
+      points: Number(points),
+      updatedAt: nowISO(),
+    }
     setState(draft)
     return { ok: true }
   }
 
-  const saveCalcConfig = ({ dailyLimit, perSubmit }) => {
+  const saveCalcConfig = ({ dailyLimit, perSubmit, pointsPerPage, neatBonus }) => {
     if (!user || user.role !== 'admin') return { ok: false, message: '无权限修改规则' }
     if (!isIntInRange(dailyLimit, 1, 100)) return { ok: false, message: '每日上限需为 1-100 的正整数' }
     if (!isIntInRange(perSubmit, 1, 50)) return { ok: false, message: '单次页数需为 1-50 的正整数' }
     if (Number(perSubmit) > Number(dailyLimit)) return { ok: false, message: '单次提交页数不得大于每日上限' }
+    if (!isIntInRange(pointsPerPage, 0, 1000)) return { ok: false, message: '每页基础积分需为 0-1000 的整数' }
+    if (!isIntInRange(neatBonus, 0, 1000)) return { ok: false, message: '字迹工整奖励需为 0-1000 的整数' }
     const draft = structuredClone(state)
     draft.calcConfig = {
       dailyLimit: Number(dailyLimit),
       perSubmit: Number(perSubmit),
+      pointsPerPage: Number(pointsPerPage),
+      neatBonus: Number(neatBonus),
       updatedAt: nowISO(),
     }
     setState(draft)

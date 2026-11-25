@@ -23,6 +23,7 @@ export default function ReadingCheckin() {
   const { state, user, todayReading, completeReading, toast } = useApp()
   const navigate = useNavigate()
   const required = state.readingConfig.minMinutes * 60
+  const readingPoints = state.readingConfig.points ?? POINTS.reading
 
   const [mode, setMode] = useState('record')
   const [elapsed, setElapsed] = useState(0)
@@ -209,7 +210,7 @@ export default function ReadingCheckin() {
         return
       }
       setSuccess(result)
-      toast(`阅读打卡成功，+${POINTS.reading} 积分`, 'success')
+      toast(`阅读打卡成功，+${readingPoints} 积分`, 'success')
     } catch {
       toast('视频保存失败，请重试', 'error')
     } finally {
@@ -238,7 +239,7 @@ export default function ReadingCheckin() {
             </div>
             <div>
               <span>获得积分</span>
-              <b>+{POINTS.reading}</b>
+              <b>+{todayReading.points ?? readingPoints}</b>
             </div>
           </div>
           <div className="done-actions">
@@ -264,7 +265,7 @@ export default function ReadingCheckin() {
       <PageHeader
         title="阅读打卡"
         subtitle="录制或观看学习视频，满时长即可打卡"
-        right={<Badge tone="amber">+{POINTS.reading} 积分</Badge>}
+        right={<Badge tone="amber">+{readingPoints} 积分</Badge>}
       />
 
       <div className="rule-chips">
@@ -399,7 +400,7 @@ export default function ReadingCheckin() {
         )}
 
         <button className="btn btn-primary full submit-btn" disabled={!canSubmit} onClick={handleSubmit}>
-          {submitting ? '正在保存…' : achieved ? `提交打卡 +${POINTS.reading} 积分` : `还差 ${Math.ceil((required - elapsed) / 60)} 分钟`}
+          {submitting ? '正在保存…' : achieved ? `提交打卡 +${readingPoints} 积分` : `还差 ${Math.ceil((required - elapsed) / 60)} 分钟`}
         </button>
       </div>
 
@@ -439,7 +440,7 @@ export default function ReadingCheckin() {
           <div className="success-icon">
             <CheckCircle2 size={30} />
           </div>
-          <div className="success-points">+{success?.points || POINTS.reading}</div>
+          <div className="success-points">+{success?.points ?? readingPoints}</div>
           <p>本次学习 {Math.round((success?.record?.durationSec || 0) / 60)} 分钟</p>
           <ProgressBar percent={100} height={7} />
           <p className="success-note">连续打卡 {user.streakDays} 天 · 累计 {user.totalDays} 天</p>

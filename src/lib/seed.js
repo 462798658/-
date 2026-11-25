@@ -42,6 +42,7 @@ export function createSeedState() {
       durationSec: 1800 + (i % 7) * 95,
       mediaId: null,
       mode: 'watch',
+      points: POINTS.reading,
       createdAt: isoAt(day, 19, 30),
     })
     events.push({
