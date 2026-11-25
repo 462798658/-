@@ -7,11 +7,52 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="description" content="学习打卡 —— 阅读与计算打卡，让坚持看得见" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%232E6B4F'/%3E%3Cpath d='M30 38l20-9 20 9-20 9-20-9z' fill='%23F6D08A'/%3E%3Cpath d='M36 46v14c0 4 6 7 14 7s14-3 14-7V46' stroke='%23fff' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
     <title>学习打卡</title>
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var panel, errors = [], probes = [], ua = navigator.userAgent || '';
+        function log(m) { probes.push(m); try { console.log('[PROBE]', m); } catch (e) {} }
+        log('UA: ' + ua.slice(0, 100));
+        log('URL: ' + location.href);
+        log('noModule: ' + ('noModule' in HTMLScriptElement.prototype));
+        window.addEventListener('error', function (e) {
+          errors.push('[ERR] ' + (e.message || String(e)));
+          try { console.error(e); } catch (x) {}
+          show();
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          errors.push('[PR] ' + (e.reason && (e.reason.message || e.reason.stack) || String(e.reason)));
+        });
+        function escapeHtml(s) {
+          return String(s).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; });
+        }
+        function show() {
+          if (!panel) {
+            panel = document.createElement('div');
+            panel.id = '__probe';
+            panel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#fff5f5;color:#c00;font:12px monospace;padding:12px;overflow:auto;z-index:999999;line-height:1.7;';
+            document.body.appendChild(panel);
+          }
+          var h = '<h2 style="margin:0 0 8px;color:#c00;">🛠 诊断面板</h2>';
+          if (errors.length) { h += '<div style="background:#ffe;border:1px solid #fcc;padding:6px;margin-bottom:8px;">'; errors.forEach(function (e) { h += '❌ ' + escapeHtml(e) + '<br>'; }); h += '</div>'; }
+          h += '<div style="background:#f9f9f9;border:1px solid #ddd;padding:6px;">';
+          probes.forEach(function (p) { h += '📋 ' + escapeHtml(p) + '<br>'; });
+          h += '</div>';
+          if (window.__appErrors && window.__appErrors.length) {
+            h += '<div style="margin-top:8px;background:#ffe;border:1px solid #fcc;padding:6px;">';
+            window.__appErrors.forEach(function (e) { h += '💥 ' + escapeHtml(e) + '<br>'; });
+            h += '</div>';
+          }
+          h += '<p style="color:#666;margin-top:10px;font-size:11px;">请截图此页面发给开发者</p>';
+          panel.innerHTML = h;
+        }
+        window.__probe = { show: show, hide: function () { if (panel) panel.style.display = 'none'; } };
+        setTimeout(function () { show(); }, 4000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

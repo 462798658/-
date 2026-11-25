@@ -11,20 +11,21 @@ window.addEventListener('error', (e) => {
   const info = `[ERROR] ${e.message} @ ${e.filename}:${e.lineno}:${e.colno}`
   console.error(info, e.error || e)
   errorStore.push(info)
+  // 通知 HTML 探针更新显示
+  try { window.__probe && window.__probe.show() } catch (_) {}
 })
 
 window.addEventListener('unhandledrejection', (e) => {
   const info = `[PROMISE] ${e.reason?.message || e.reason}`
   console.error(info)
   errorStore.push(info)
+  try { window.__probe && window.__probe.show() } catch (_) {}
 })
 
-// 打印运行时环境
 console.log('[ENV] userAgent:', navigator.userAgent)
 console.log('[ENV] location:', location.href)
 console.log('[ENV] localStorage:', typeof localStorage)
 console.log('[ENV] indexedDB:', typeof indexedDB)
-console.log('[ENV] serviceWorker:', 'serviceWorker' in navigator)
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -37,6 +38,7 @@ class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     this.setState({ stack: info.componentStack })
     console.error('[ErrorBoundary]', error, info)
+    try { window.__probe && window.__probe.show() } catch (_) {}
   }
   render() {
     if (!this.state.error) return this.props.children
@@ -64,16 +66,23 @@ class ErrorBoundary extends Component {
   }
 }
 
-const root = createRoot(document.getElementById('root'))
-
-// 先尝试渲染 App，如果连 ErrorBoundary 都挂了显示紧急兜底
 try {
+  const root = createRoot(document.getElementById('root'))
   root.render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
   )
+  // React 成功挂载，隐藏 HTML 原生探针
+  setTimeout(() => {
+    try { window.__probe && window.__probe.hide() } catch (_) {}
+  }, 500)
 } catch (fatal) {
+  console.error('[FATAL] React mount failed:', fatal)
+  errorStore.push('[FATAL] ' + (fatal?.message || fatal))
+  // 让 HTML 探针显示
+  try { window.__probe && window.__probe.show() } catch (_) {}
+  // 同时也在 root 里放兜底
   document.getElementById('root').innerHTML = `
     <div style="padding:20px;font-family:monospace;color:#c00;background:#fff5f5;min-height:100vh;">
       <h2>React 挂载失败</h2>
