@@ -12,45 +12,35 @@
   <body>
     <div id="root"></div>
     <script>
+      // 诊断探针：只在捕获到错误时才显示，正常情况下不出现
       (function () {
-        var panel, errors = [], probes = [], ua = navigator.userAgent || '';
-        function log(m) { probes.push(m); try { console.log('[PROBE]', m); } catch (e) {} }
-        log('UA: ' + ua.slice(0, 100));
-        log('URL: ' + location.href);
-        log('noModule: ' + ('noModule' in HTMLScriptElement.prototype));
+        var panel = null, errors = [], startedAt = Date.now();
         window.addEventListener('error', function (e) {
-          errors.push('[ERR] ' + (e.message || String(e)));
-          try { console.error(e); } catch (x) {}
-          show();
+          errors.push('[ERR] ' + (e.message || String(e)) + ' @ ' + (e.filename || '?') + ':' + (e.lineno || '?'));
+          try { console.error('[PROBE]', e.message, e); } catch (x) {}
+          showPanel();
         }, true);
         window.addEventListener('unhandledrejection', function (e) {
           errors.push('[PR] ' + (e.reason && (e.reason.message || e.reason.stack) || String(e.reason)));
         });
-        function escapeHtml(s) {
-          return String(s).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; });
+        function escape(s) { return String(s).replace(/[<>&]/g, function(c){ return { '<':'&lt;', '>':'&gt;', '&':'&amp;' }[c]; }); }
+        function showPanel() {
+          if (panel) return;
+          panel = document.createElement('div');
+          panel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,245,245,0.97);color:#c00;font:12px monospace;padding:12px;overflow:auto;z-index:2147483647;line-height:1.7;';
+          panel.innerHTML = '<h2 style="margin:0 0 8px;color:#c00;">🛠 诊断面板（错误！）</h2>' +
+            '<p style="margin:4px 0;color:#666;font-size:11px;">UA: ' + escape((navigator.userAgent||'').slice(0,140)) + '</p>' +
+            '<p style="margin:4px 0;color:#666;font-size:11px;">URL: ' + escape(location.href) + '</p>' +
+            '<p style="margin:4px 0;color:#666;font-size:11px;">noModule: ' + ('noModule' in HTMLScriptElement.prototype) + '</p>' +
+            '<p style="margin:4px 0;color:#666;font-size:11px;">root null: ' + (document.getElementById('root') === null) + '</p>' +
+            (errors.length ? '<div style="background:#ffe;border:1px solid #fcc;padding:6px;margin:8px 0;">' + errors.map(function(e){ return '❌ ' + escape(e); }).join('<br>') + '</div>' : '') +
+            '<p style="color:#666;margin-top:10px;font-size:11px;">请截图此页面发给开发者</p>';
+          document.body.appendChild(panel);
         }
-        function show() {
-          if (!panel) {
-            panel = document.createElement('div');
-            panel.id = '__probe';
-            panel.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#fff5f5;color:#c00;font:12px monospace;padding:12px;overflow:auto;z-index:999999;line-height:1.7;';
-            document.body.appendChild(panel);
-          }
-          var h = '<h2 style="margin:0 0 8px;color:#c00;">🛠 诊断面板</h2>';
-          if (errors.length) { h += '<div style="background:#ffe;border:1px solid #fcc;padding:6px;margin-bottom:8px;">'; errors.forEach(function (e) { h += '❌ ' + escapeHtml(e) + '<br>'; }); h += '</div>'; }
-          h += '<div style="background:#f9f9f9;border:1px solid #ddd;padding:6px;">';
-          probes.forEach(function (p) { h += '📋 ' + escapeHtml(p) + '<br>'; });
-          h += '</div>';
-          if (window.__appErrors && window.__appErrors.length) {
-            h += '<div style="margin-top:8px;background:#ffe;border:1px solid #fcc;padding:6px;">';
-            window.__appErrors.forEach(function (e) { h += '💥 ' + escapeHtml(e) + '<br>'; });
-            h += '</div>';
-          }
-          h += '<p style="color:#666;margin-top:10px;font-size:11px;">请截图此页面发给开发者</p>';
-          panel.innerHTML = h;
-        }
-        window.__probe = { show: show, hide: function () { if (panel) panel.style.display = 'none'; } };
-        setTimeout(function () { show(); }, 4000);
+        window.__probe = {
+          show: showPanel,
+          hide: function () { if (panel) panel.style.display = 'none'; },
+        };
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>
