@@ -48,6 +48,31 @@ export default function ReadingCheckin() {
   const chunksRef = useRef([])
   const fileInputRef = useRef(null)
 
+  // 专门处理 video.srcObject 绑定 —— useEffect 保证 React 已 commit DOM
+  useEffect(() => {
+    if (!recording || !streamRef.current) return
+    const v = liveRef.current
+    if (!v) return
+    v.srcObject = streamRef.current
+    v.muted = true
+    try {
+      v.setAttribute('muted', '')
+      v.setAttribute('playsinline', '')
+      v.setAttribute('webkit-playsinline', '')
+    } catch (e) {}
+    const tryPlay = () => {
+      const el = liveRef.current
+      if (!el || !streamRef.current) return
+      const p = el.play()
+      if (p && typeof p.then === 'function') {
+        p.catch(() => setTimeout(tryPlay, 300))
+      }
+    }
+    tryPlay()
+    const t = setTimeout(tryPlay, 150)
+    return () => clearTimeout(t)
+  }, [recording])
+
   const timing = mode === 'record' ? recordTiming : isPlaying
 
   useEffect(() => {
@@ -92,47 +117,23 @@ export default function ReadingCheckin() {
       return
     }
     try {
-      // 荣耀等国产 Android WebView 上，getUserMedia 会弹权限框，
-      // await 之后用户手势上下文丢失 → video.play() 被 autoplay policy 拦截。
-      // 这里把 MediaRecorder 的启动和 stream 设置分开处理，
-      // play() 用 fire-and-forget 并且 video 带 muted+autoplay 属性来绕过限制。
+      // 模拟器 WebView 对 facingMode/ideal width 兼容性差 —— 先用最简约束
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: true,
         audio: false,
       })
       if (stream.getVideoTracks().length === 0) {
         throw new Error('no video track')
       }
       streamRef.current = stream
+      console.log('[RECORD] stream ok, tracks:', stream.getVideoTracks().length, stream.getAudioTracks().length)
 
-      // 关键：先触发 re-render（让 React 把 <video> 挂好），再在下一帧设 srcObject
+      // 触发 useEffect 挂载 DOM 后绑定 srcObject
       setRecording(true)
       setRecordTiming(true)
       setCameraError(false)
 
-      requestAnimationFrame(() => {
-        const v = liveRef.current
-        if (!v) return
-        v.srcObject = stream
-        v.muted = true
-        v.setAttribute('muted', '')
-        v.setAttribute('autoplay', '')
-        // Android WebView 上 muted 的视频应该能自动播
-        // 用 fire-and-forget 避免 await 再次丢上下文
-        const p = v.play()
-        if (p && typeof p.then === 'function') {
-          p.catch(() => {
-            // play 被拦截（不是 muted 的问题就是别的），
-            // 等下一个 tick 再试一次
-            setTimeout(() => {
-              if (!liveRef.current || !liveRef.current.srcObject) return
-              liveRef.current.play().catch(() => {})
-            }, 300)
-          })
-        }
-      })
-
-      // MediaRecorder 也等一下 stream 完全就绪
+      // MediaRecorder
       const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
       const mimeType = candidates.find((t) => MediaRecorder.isTypeSupported?.(t))
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 900000 } : undefined)
