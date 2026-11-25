@@ -1,0 +1,13 @@
+{
+  "appId": "com.xuexi.checkin",
+  "appName": "学习打卡",
+  "webDir": "dist",
+  "backgroundColor": "#F5F1E8",
+  "android": {
+    "backgroundColor": "#F5F1E8",
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
