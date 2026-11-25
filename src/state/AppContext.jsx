@@ -4,6 +4,7 @@ import {
   isGiftUnlocked,
   makeDefaultCalcConfig,
   makeDefaultReadingConfig,
+  validateGiftForm,
   validateHomeworkForm,
   validateLadderForm,
   POINTS,
@@ -28,6 +29,7 @@ function loadState() {
       if (parsed && parsed.version === 1) {
         parsed.readingConfig = { ...makeDefaultReadingConfig(), ...(parsed.readingConfig || {}) }
         parsed.calcConfig = { ...makeDefaultCalcConfig(), ...(parsed.calcConfig || {}) }
+        parsed.gifts = (parsed.gifts || []).map((gift) => ({ ...gift, isOnShelf: gift.isOnShelf !== false }))
         return parsed
       }
     }
@@ -292,6 +294,8 @@ export function AppProvider({ children }) {
     if (!user) return { ok: false, message: '请先登录' }
     const gift = state.gifts.find((g) => g.id === giftId)
     if (!gift) return { ok: false, message: '礼品不存在' }
+    if (gift.isOnShelf === false) return { ok: false, message: '该礼品已下架，暂无法兑换' }
+    if (gift.type !== 'virtual') return { ok: false, message: '礼品类型不正确' }
     const unlocks = state.unlocks[user.id]
     if (!isGiftUnlocked(gift, user, unlocks, state.ladders)) {
       return { ok: false, message: '尚未满足该礼品的解锁条件' }
@@ -325,6 +329,8 @@ export function AppProvider({ children }) {
     if (!user) return { ok: false, message: '请先登录' }
     const gift = state.gifts.find((g) => g.id === giftId)
     if (!gift) return { ok: false, message: '礼品不存在' }
+    if (gift.isOnShelf === false) return { ok: false, message: '该礼品已下架，暂无法兑换' }
+    if (gift.type !== 'physical') return { ok: false, message: '礼品类型不正确' }
     const unlocks = state.unlocks[user.id]
     if (!isGiftUnlocked(gift, user, unlocks, state.ladders)) {
       return { ok: false, message: '尚未满足该礼品的解锁条件' }
@@ -630,6 +636,73 @@ export function AppProvider({ children }) {
     return { ok: true }
   }
 
+  const saveGift = (form, id) => {
+    if (!user || user.role !== 'admin') return { ok: false, message: '无权限管理礼品' }
+    const error = validateGiftForm(form)
+    if (error) return { ok: false, message: error }
+    const draft = structuredClone(state)
+    const target = id ? draft.gifts.find((g) => g.id === id) : null
+    if (id && !target) return { ok: false, message: '礼品不存在' }
+    const type = target?.type || form.type
+    const unlock = form.unlock || { type: 'none' }
+    const values = {
+      name: form.name.trim(),
+      type,
+      cost: Number(form.cost),
+      stock: type === 'physical' ? Number(form.stock) : null,
+      budget: type === 'physical' ? Number(form.budget) : null,
+      avatar: type === 'virtual' ? !!form.avatar : false,
+      image: form.image.trim(),
+      desc: (form.desc || '').trim(),
+      unlock: {
+        type: unlock.type,
+        ...(['streak', 'days'].includes(unlock.type) ? { value: Number(unlock.value) } : {}),
+      },
+      updatedAt: nowISO(),
+    }
+    if (target) {
+      Object.assign(target, values)
+    } else {
+      draft.gifts.push({
+        id: uid('g'),
+        ...values,
+        custom: false,
+        isOnShelf: true,
+        createdAt: nowISO(),
+      })
+    }
+    setState(draft)
+    return { ok: true }
+  }
+
+  const setGiftShelf = (id, isOnShelf) => {
+    if (!user || user.role !== 'admin') return { ok: false, message: '无权限管理礼品' }
+    if (typeof isOnShelf !== 'boolean') return { ok: false, message: '上下架状态不正确' }
+    const draft = structuredClone(state)
+    const target = draft.gifts.find((g) => g.id === id)
+    if (!target) return { ok: false, message: '礼品不存在' }
+    target.isOnShelf = isOnShelf
+    target.updatedAt = nowISO()
+    setState(draft)
+    return { ok: true }
+  }
+
+  const deleteGift = (id) => {
+    if (!user || user.role !== 'admin') return { ok: false, message: '无权限管理礼品' }
+    if (!state.gifts.some((g) => g.id === id)) return { ok: false, message: '礼品不存在' }
+    const references = []
+    if (state.orders.some((o) => o.giftId === id)) references.push('兑换订单')
+    if (state.ladders.some((l) => l.giftId === id)) references.push('打卡阶梯')
+    if (state.users.some((u) => u.ownedAvatars?.includes(id))) references.push('学员虚拟权益')
+    if (references.length) {
+      return { ok: false, message: `该礼品已关联${references.join('、')}，无法删除，请先下架` }
+    }
+    const draft = structuredClone(state)
+    draft.gifts = draft.gifts.filter((g) => g.id !== id)
+    setState(draft)
+    return { ok: true }
+  }
+
   const resetDemo = async () => {
     try {
       localStorage.removeItem(STORAGE_KEY)
@@ -673,6 +746,9 @@ export function AppProvider({ children }) {
     saveHomeworkConfig,
     saveLadder,
     deleteLadder,
+    saveGift,
+    setGiftShelf,
+    deleteGift,
     resetDemo,
     todayReading,
     todayCalc,

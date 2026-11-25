@@ -5314,6 +5314,155 @@ p {
   gap: 5px;
 }
 
+.gift-admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gift-admin-row {
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.gift-admin-row.off-shelf .gift-admin-img {
+  filter: grayscale(0.75);
+  opacity: 0.65;
+}
+
+.gift-admin-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.gift-admin-img {
+  flex-shrink: 0;
+  width: 62px;
+  height: 62px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.gift-admin-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.gift-admin-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gift-admin-heading b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.gift-admin-heading .badge {
+  flex-shrink: 0;
+}
+
+.gift-admin-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 5px 0 3px;
+  color: var(--ink-soft);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+.gift-admin-unlock {
+  display: block;
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+.gift-admin-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.gift-admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gift-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gift-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gift-image-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.gift-image-preview-img {
+  width: 68px;
+  height: 68px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--surface-soft);
+}
+
+.gift-avatar-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.gift-avatar-option input {
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+
+.gift-avatar-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gift-avatar-option b {
+  font-size: 11.5px;
+}
+
+.gift-avatar-option small {
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
 .admin-tip {
   display: flex;
   align-items: flex-start;

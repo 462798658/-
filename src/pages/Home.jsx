@@ -184,7 +184,7 @@ export default function Home() {
             <Gift size={20} />
           </span>
           <span>礼品商城</span>
-          <em>{state.gifts.filter((g) => g.type === 'virtual').length + state.gifts.filter((g) => g.type === 'physical').length} 件好礼</em>
+          <em>{state.gifts.filter((g) => g.isOnShelf !== false).length} 件好礼</em>
         </button>
         <button className="quick-item" onClick={() => navigate('/checkin/reading/history')}>
           <span className="quick-icon mint">

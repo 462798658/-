@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   Calculator,
   Check,
@@ -22,7 +24,8 @@ import {
   X,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { Badge, Field, MediaImage, Modal, PageHeader, Sheet } from '../components/ui'
+import { Badge, Field, ImageWithFallback, MediaImage, Modal, PageHeader, Sheet } from '../components/ui'
+import { giftUnlockText } from '../lib/domain'
 import { formatDateTime, uid } from '../lib/utils'
 
 const TABS = [
@@ -30,10 +33,22 @@ const TABS = [
   { value: 'homework', label: '作业打卡' },
   { value: 'reading', label: '阅读打卡' },
   { value: 'calc', label: '计算打卡' },
+  { value: 'gift', label: '礼品管理' },
   { value: 'review', label: '兑换审核' },
 ]
 
 const emptyLadder = { days: '', name: '', desc: '', giftId: '' }
+const emptyGift = {
+  name: '',
+  type: 'physical',
+  cost: '',
+  stock: '10',
+  budget: '',
+  avatar: false,
+  image: '',
+  desc: '',
+  unlock: { type: 'none', value: '' },
+}
 
 export default function Admin() {
   const {
@@ -41,6 +56,9 @@ export default function Admin() {
     user,
     saveLadder,
     deleteLadder,
+    saveGift,
+    setGiftShelf,
+    deleteGift,
     saveHomeworkConfig,
     saveReadingConfig,
     saveCalcConfig,
@@ -56,6 +74,12 @@ export default function Admin() {
   const [ladderForm, setLadderForm] = useState(emptyLadder)
   const [ladderError, setLadderError] = useState('')
   const [deleteLadderId, setDeleteLadderId] = useState(null)
+
+  const [giftOpen, setGiftOpen] = useState(false)
+  const [editingGift, setEditingGift] = useState(null)
+  const [giftForm, setGiftForm] = useState(emptyGift)
+  const [giftError, setGiftError] = useState('')
+  const [deleteGiftId, setDeleteGiftId] = useState(null)
 
   const [homework, setHomework] = useState(() => ({
     totalPages: String(state.homeworkConfig.totalPages),
@@ -106,6 +130,14 @@ export default function Admin() {
   const sortedLadders = [...state.ladders].sort((a, b) => a.days - b.days)
   const pendingOrders = state.orders.filter((o) => o.status === '待审核')
   const shippedOrders = state.orders.filter((o) => o.status === '已发货')
+  const deletingGift = gifts.find((g) => g.id === deleteGiftId) || null
+  const deletingGiftRefs = deletingGift
+    ? [
+        state.orders.some((o) => o.giftId === deletingGift.id) ? '兑换订单' : null,
+        state.ladders.some((l) => l.giftId === deletingGift.id) ? '打卡阶梯' : null,
+        state.users.some((u) => u.ownedAvatars?.includes(deletingGift.id)) ? '学员虚拟权益' : null,
+      ].filter(Boolean)
+    : []
 
   const openLadderNew = () => {
     setEditingLadder(null)
@@ -141,6 +173,69 @@ export default function Admin() {
     if (!res.ok) toast(res.message, 'error')
     else toast('阶梯目标已删除，已解锁学员的奖励保持不变', 'success')
     setDeleteLadderId(null)
+  }
+
+  const openGiftNew = () => {
+    setEditingGift(null)
+    setGiftForm({ ...emptyGift, unlock: { ...emptyGift.unlock } })
+    setGiftError('')
+    setGiftOpen(true)
+  }
+
+  const openGiftEdit = (gift) => {
+    setEditingGift(gift)
+    setGiftForm({
+      name: gift.name,
+      type: gift.type,
+      cost: String(gift.cost),
+      stock: gift.stock === null ? '' : String(gift.stock),
+      budget: gift.budget === null || gift.budget === undefined ? '' : String(gift.budget),
+      avatar: !!gift.avatar,
+      image: gift.image || '',
+      desc: gift.desc || '',
+      unlock: {
+        type: gift.unlock?.type || 'none',
+        value: gift.unlock?.value ? String(gift.unlock.value) : '',
+      },
+    })
+    setGiftError('')
+    setGiftOpen(true)
+  }
+
+  const updateGift = (key, value) => setGiftForm((g) => ({ ...g, [key]: value }))
+  const updateGiftUnlock = (key, value) => {
+    setGiftForm((g) => ({ ...g, unlock: { ...g.unlock, [key]: value } }))
+  }
+
+  const submitGift = () => {
+    const res = saveGift(giftForm, editingGift?.id)
+    if (!res.ok) {
+      setGiftError(res.message)
+      return
+    }
+    setGiftError('')
+    toast(editingGift ? '礼品信息已更新并同步至商城' : '礼品已新增并默认上架', 'success')
+    setGiftOpen(false)
+  }
+
+  const handleGiftShelf = (gift, isOnShelf) => {
+    const res = setGiftShelf(gift.id, isOnShelf)
+    if (!res.ok) {
+      toast(res.message, 'error')
+      return false
+    }
+    toast(isOnShelf ? `「${gift.name}」已上架` : `「${gift.name}」已下架，商城不再展示`, 'success')
+    return true
+  }
+
+  const confirmDeleteGift = () => {
+    const res = deleteGift(deleteGiftId)
+    if (!res.ok) {
+      toast(res.message, 'error')
+      return
+    }
+    toast('礼品已删除', 'success')
+    setDeleteGiftId(null)
   }
 
   const applyMode = (mode) => {
@@ -500,6 +595,69 @@ export default function Admin() {
         </div>
       ) : null}
 
+      {tab === 'gift' ? (
+        <div className="admin-panel">
+          <div className="admin-panel-head">
+            <div>
+              <h2>礼品管理</h2>
+              <p>维护商城礼品、库存与解锁条件，下架后学员不可兑换</p>
+            </div>
+            <button className="mini-btn" onClick={openGiftNew}>
+              <Plus size={14} /> 新增
+            </button>
+          </div>
+
+          <div className="gift-admin-list">
+            {gifts.map((gift) => (
+              <div key={gift.id} className={`gift-admin-row ${gift.isOnShelf === false ? 'off-shelf' : ''}`}>
+                <div className="gift-admin-top">
+                  <ImageWithFallback src={gift.image} alt={gift.name} className="gift-admin-img" />
+                  <div className="gift-admin-main">
+                    <div className="gift-admin-heading">
+                      <b>{gift.name}</b>
+                      <Badge tone={gift.type === 'virtual' ? 'mint' : 'sky'}>
+                        {gift.type === 'virtual' ? '虚拟' : '实物'}
+                      </Badge>
+                    </div>
+                    <p className="gift-admin-meta">
+                      <Coins size={12} /> {gift.cost} 积分 · {gift.type === 'physical'
+                        ? `库存 ${gift.stock} · 预算 ¥${gift.budget}`
+                        : gift.avatar
+                          ? '兑换后应用头像'
+                          : '自动加入装扮库'}
+                    </p>
+                    <span className="gift-admin-unlock">{giftUnlockText(gift, state.ladders)}</span>
+                  </div>
+                </div>
+                <div className="gift-admin-foot">
+                  <Badge tone={gift.isOnShelf === false ? 'neutral' : 'primary'}>
+                    {gift.isOnShelf === false ? '已下架' : '已上架'}
+                  </Badge>
+                  <div className="gift-admin-actions">
+                    <button className="mini-btn ghost" onClick={() => handleGiftShelf(gift, gift.isOnShelf === false)}>
+                      {gift.isOnShelf === false ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+                      {gift.isOnShelf === false ? '上架' : '下架'}
+                    </button>
+                    <button className="icon-btn small" onClick={() => openGiftEdit(gift)} aria-label={`编辑${gift.name}`}>
+                      <Pencil size={15} />
+                    </button>
+                    <button className="icon-btn small danger" onClick={() => setDeleteGiftId(gift.id)} aria-label={`删除${gift.name}`}>
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {gifts.length === 0 ? <p className="admin-empty">暂无礼品，点击右上角新增。</p> : null}
+          </div>
+
+          <div className="admin-tip">
+            <AlertTriangle size={14} />
+            已被订单、打卡阶梯或学员虚拟权益引用的礼品不可直接删除，可先下架；下架不影响已有订单审核。
+          </div>
+        </div>
+      ) : null}
+
       {tab === 'review' ? (
         <div className="admin-panel">
           <div className="admin-panel-head">
@@ -633,12 +791,131 @@ export default function Admin() {
               <option value="">不关联礼品</option>
               {gifts.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.name}（{g.type === 'virtual' ? '虚拟' : '实物'} · {g.cost} 积分）
+                  {g.name}（{g.type === 'virtual' ? '虚拟' : '实物'} · {g.cost} 积分{g.isOnShelf === false ? ' · 已下架' : ''}）
                 </option>
               ))}
             </select>
           </Field>
           {ladderError ? <p className="form-error">{ladderError}</p> : null}
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={giftOpen}
+        onClose={() => setGiftOpen(false)}
+        title={editingGift ? '编辑礼品' : '新增礼品'}
+        subtitle={editingGift ? '修改后立即同步至商城，上下架状态保持不变' : '新礼品保存后默认上架'}
+        footer={
+          <button className="btn btn-primary full" onClick={submitGift}>
+            {editingGift ? '保存修改' : '新增并上架'}
+          </button>
+        }
+      >
+        <div className="gift-form">
+          <Field label="礼品类型" required hint={editingGift ? '为保护历史订单与权益，编辑时不可更换类型' : '新增后礼品类型不可更换'}>
+            <select value={giftForm.type} disabled={!!editingGift} onChange={(e) => updateGift('type', e.target.value)}>
+              <option value="physical">实物礼品</option>
+              <option value="virtual">虚拟礼品</option>
+            </select>
+          </Field>
+          <Field label="礼品名称" required hint="不超过 30 个字">
+            <input
+              type="text"
+              maxLength={30}
+              placeholder="例如：创意书签套装"
+              value={giftForm.name}
+              onChange={(e) => updateGift('name', e.target.value)}
+            />
+          </Field>
+          <Field label="兑换积分" required hint="正整数，范围 1-1000000">
+            <input
+              type="number"
+              min="1"
+              max="1000000"
+              placeholder="例如：300"
+              value={giftForm.cost}
+              onChange={(e) => updateGift('cost', e.target.value)}
+            />
+          </Field>
+          <Field label="图片地址" required hint="支持 https:// 图片 URL 或本站 / 开头资源路径">
+            <input
+              type="text"
+              maxLength={2048}
+              placeholder="https://example.com/gift.png"
+              value={giftForm.image}
+              onChange={(e) => updateGift('image', e.target.value)}
+            />
+          </Field>
+          {giftForm.image ? (
+            <div className="gift-image-preview">
+              <ImageWithFallback src={giftForm.image.trim()} alt="礼品图片预览" className="gift-image-preview-img" />
+              <span>图片预览</span>
+            </div>
+          ) : null}
+          <Field label="礼品说明" hint="选填，不超过 120 个字">
+            <textarea
+              rows={3}
+              maxLength={120}
+              placeholder="介绍礼品内容、用途或发放方式"
+              value={giftForm.desc}
+              onChange={(e) => updateGift('desc', e.target.value)}
+            />
+          </Field>
+
+          {giftForm.type === 'physical' ? (
+            <div className="gift-form-grid">
+              <Field label="库存数量" required hint="0 表示售罄">
+                <input
+                  type="number"
+                  min="0"
+                  max="1000000"
+                  value={giftForm.stock}
+                  onChange={(e) => updateGift('stock', e.target.value)}
+                />
+              </Field>
+              <Field label="采购预算（元）" required hint="大于 0，不超过 100">
+                <input
+                  type="number"
+                  min="0.01"
+                  max="100"
+                  step="0.01"
+                  placeholder="例如：29"
+                  value={giftForm.budget}
+                  onChange={(e) => updateGift('budget', e.target.value)}
+                />
+              </Field>
+            </div>
+          ) : (
+            <label className="gift-avatar-option">
+              <input type="checkbox" checked={giftForm.avatar} onChange={(e) => updateGift('avatar', e.target.checked)} />
+              <span>
+                <b>兑换后应用为头像</b>
+                <small>关闭时仅加入学员的虚拟装扮库</small>
+              </span>
+            </label>
+          )}
+
+          <Field label="解锁条件" required>
+            <select value={giftForm.unlock.type} onChange={(e) => updateGiftUnlock('type', e.target.value)}>
+              <option value="none">无门槛，可直接兑换</option>
+              <option value="streak">连续打卡达到指定天数</option>
+              <option value="days">累计打卡达到指定天数</option>
+              <option value="ladderMax">解锁最高打卡阶梯</option>
+            </select>
+          </Field>
+          {['streak', 'days'].includes(giftForm.unlock.type) ? (
+            <Field label="所需打卡天数" required hint="正整数，范围 1-3650">
+              <input
+                type="number"
+                min="1"
+                max="3650"
+                placeholder="例如：7"
+                value={giftForm.unlock.value}
+                onChange={(e) => updateGiftUnlock('value', e.target.value)}
+              />
+            </Field>
+          ) : null}
+          {giftError ? <p className="form-error">{giftError}</p> : null}
         </div>
       </Sheet>
 
@@ -655,6 +932,40 @@ export default function Admin() {
             <button className="btn btn-danger" onClick={confirmDeleteLadder}>
               确认删除
             </button>
+          </div>
+        }
+      />
+
+      <Modal
+        open={!!deletingGift}
+        onClose={() => setDeleteGiftId(null)}
+        title={deletingGiftRefs.length ? '无法直接删除礼品' : '删除礼品'}
+        description={
+          deletingGiftRefs.length
+            ? `「${deletingGift?.name}」已关联${deletingGiftRefs.join('、')}，为保护历史记录不可删除。${deletingGift?.isOnShelf !== false ? '可先将其下架。' : '该礼品当前已下架。'}`
+            : deletingGift
+              ? `确定删除「${deletingGift.name}」吗？删除后不可恢复。`
+              : ''
+        }
+        footer={
+          <div className="modal-actions">
+            <button className="btn btn-ghost" onClick={() => setDeleteGiftId(null)}>
+              {deletingGiftRefs.length ? '关闭' : '取消'}
+            </button>
+            {deletingGiftRefs.length === 0 ? (
+              <button className="btn btn-danger" onClick={confirmDeleteGift}>
+                确认删除
+              </button>
+            ) : deletingGift?.isOnShelf !== false ? (
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (handleGiftShelf(deletingGift, false)) setDeleteGiftId(null)
+                }}
+              >
+                改为下架
+              </button>
+            ) : null}
           </div>
         }
       />

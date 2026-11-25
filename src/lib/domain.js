@@ -92,7 +92,7 @@ export const makeDefaultGifts = () => [
     desc: '解锁最高打卡阶梯后开放，可自选 100 元以内心仪好物。',
     unlock: { type: 'ladderMax' },
   },
-]
+].map((gift) => ({ isOnShelf: true, ...gift }))
 
 export const makeDefaultLadders = () => [
   {
@@ -228,6 +228,32 @@ export function validateHomeworkForm(form) {
       if (!s.name || !s.name.trim()) return '请填写阶段名称'
       if (!isIntInRange(s.pages, 1, 10000)) return '阶段页数需为 1-10000 的正整数'
     }
+  }
+  return null
+}
+
+export function validateGiftForm(form) {
+  if (!form.name || !form.name.trim()) return '请填写礼品名称'
+  if (form.name.trim().length > 30) return '礼品名称不超过 30 个字'
+  if (!['virtual', 'physical'].includes(form.type)) return '请选择正确的礼品类型'
+  if (!isIntInRange(form.cost, 1, 1000000)) return '兑换积分需为 1-1000000 的正整数'
+  const image = (form.image || '').trim()
+  if (!image) return '请填写礼品图片地址'
+  if (image.length > 2048 || !(/^https:\/\/\S+$/.test(image) || /^\/(?!\/)\S+$/.test(image))) {
+    return '图片地址需为有效的 https:// URL 或本站 / 开头路径'
+  }
+  if ((form.desc || '').length > 120) return '礼品说明不超过 120 个字'
+  if (form.type === 'physical') {
+    if (form.stock === '' || form.stock === null || form.stock === undefined || !isIntInRange(form.stock, 0, 1000000)) {
+      return '库存需为 0-1000000 的整数'
+    }
+    const budget = Number(form.budget)
+    if (!Number.isFinite(budget) || budget <= 0 || budget > 100) return '实物预算需大于 0 且不超过 100 元'
+  }
+  const unlock = form.unlock || { type: 'none' }
+  if (!['none', 'streak', 'days', 'ladderMax'].includes(unlock.type)) return '请选择正确的解锁条件'
+  if (['streak', 'days'].includes(unlock.type) && !isIntInRange(unlock.value, 1, 3650)) {
+    return '解锁天数需为 1-3650 的正整数'
   }
   return null
 }

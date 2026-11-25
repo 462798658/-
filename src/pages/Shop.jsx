@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { Badge, ImageWithFallback, Modal, PageHeader, Segmented, Sheet } from '../components/ui'
+import { Badge, EmptyState, ImageWithFallback, Modal, PageHeader, Segmented, Sheet } from '../components/ui'
 import { giftUnlockText, isGiftUnlocked } from '../lib/domain'
 import { putMedia } from '../lib/media'
 import { uid } from '../lib/utils'
@@ -47,8 +47,9 @@ export default function Shop() {
 
   const unlocks = state.unlocks[user.id] || { ladders: [], stages: [] }
   const myAddresses = state.addresses.filter((a) => a.userId === user.id)
-  const gifts = state.gifts.filter((g) => (filter === 'all' ? true : g.type === filter))
-  const gift = state.gifts.find((g) => g.id === activeId) || null
+  const availableGifts = state.gifts.filter((g) => g.isOnShelf !== false)
+  const gifts = availableGifts.filter((g) => (filter === 'all' ? true : g.type === filter))
+  const gift = availableGifts.find((g) => g.id === activeId) || null
 
   const openGift = (id) => {
     setActiveId(id)
@@ -85,6 +86,11 @@ export default function Shop() {
   const inStock = gift ? gift.type === 'virtual' || gift.stock > 0 : false
 
   const handleVirtual = () => {
+    if (!gift) {
+      setConfirmVirtual(false)
+      toast('该礼品已下架，暂无法兑换', 'error')
+      return
+    }
     const res = redeemVirtual(gift.id)
     if (!res.ok) {
       toast(res.message, 'error')
@@ -107,6 +113,10 @@ export default function Shop() {
   }
 
   const handlePhysical = async () => {
+    if (!gift) {
+      toast('该礼品已下架，暂无法兑换', 'error')
+      return
+    }
     if (!addressId) {
       toast('请先填写收货地址', 'error')
       return
@@ -217,7 +227,11 @@ export default function Shop() {
 
       <Segmented options={FILTERS} value={filter} onChange={setFilter} className="shop-tabs" />
 
-      <div className="gift-grid">{gifts.map(renderGiftCard)}</div>
+      {gifts.length ? (
+        <div className="gift-grid">{gifts.map(renderGiftCard)}</div>
+      ) : (
+        <EmptyState icon={<Gift size={26} />} title="暂无礼品" description="当前分类暂无上架礼品，请稍后再来看看。" />
+      )}
 
       <div className="shop-note">
         <Package size={15} />
@@ -406,7 +420,7 @@ export default function Shop() {
       </Sheet>
 
       <Modal
-        open={confirmVirtual}
+        open={confirmVirtual && !!gift}
         onClose={() => setConfirmVirtual(false)}
         title="确认兑换"
         description={gift ? `将使用 ${gift.cost} 积分兑换「${gift.name}」，兑换后积分不可退回。` : ''}
