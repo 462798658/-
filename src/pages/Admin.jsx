@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -6,11 +6,13 @@ import {
   ArrowUp,
   BookOpen,
   Calculator,
+  Camera,
   Check,
   CheckCircle2,
   ChevronRight,
   Coins,
   Gift,
+  ImagePlus,
   Layers,
   LockKeyhole,
   Package,
@@ -24,7 +26,7 @@ import {
   X,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { Badge, Field, ImageWithFallback, MediaImage, Modal, PageHeader, Sheet } from '../components/ui'
+import { Badge, Field, GiftImage, ImageWithFallback, MediaImage, Modal, PageHeader, Sheet } from '../components/ui'
 import { giftUnlockText } from '../lib/domain'
 import { formatDateTime, uid } from '../lib/utils'
 
@@ -46,6 +48,7 @@ const emptyGift = {
   budget: '',
   avatar: false,
   image: '',
+  imageMediaId: null,
   desc: '',
   unlock: { type: 'none', value: '' },
 }
@@ -79,6 +82,11 @@ export default function Admin() {
   const [editingGift, setEditingGift] = useState(null)
   const [giftForm, setGiftForm] = useState(emptyGift)
   const [giftError, setGiftError] = useState('')
+  const [giftImageFile, setGiftImageFile] = useState(null)
+  const [giftImagePreviewUrl, setGiftImagePreviewUrl] = useState('')
+  const [giftSaving, setGiftSaving] = useState(false)
+  const giftAlbumRef = useRef(null)
+  const giftCameraRef = useRef(null)
   const [deleteGiftId, setDeleteGiftId] = useState(null)
 
   const [homework, setHomework] = useState(() => ({
@@ -107,6 +115,13 @@ export default function Admin() {
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejectRemark, setRejectRemark] = useState('')
   const [seenOrderId, setSeenOrderId] = useState(null)
+
+  useEffect(
+    () => () => {
+      if (giftImagePreviewUrl) URL.revokeObjectURL(giftImagePreviewUrl)
+    },
+    [giftImagePreviewUrl],
+  )
 
   if (!user || user.role !== 'admin') {
     return (
@@ -175,7 +190,34 @@ export default function Admin() {
     setDeleteLadderId(null)
   }
 
+  const resetGiftImageDraft = () => {
+    setGiftImageFile(null)
+    setGiftImagePreviewUrl('')
+    if (giftAlbumRef.current) giftAlbumRef.current.value = ''
+    if (giftCameraRef.current) giftCameraRef.current.value = ''
+  }
+
+  const closeGift = () => {
+    if (giftSaving) return
+    resetGiftImageDraft()
+    setGiftOpen(false)
+  }
+
+  const handleGiftImage = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setGiftError('请选择图片文件')
+      return
+    }
+    setGiftError('')
+    setGiftImageFile(file)
+    setGiftImagePreviewUrl(URL.createObjectURL(file))
+  }
+
   const openGiftNew = () => {
+    resetGiftImageDraft()
     setEditingGift(null)
     setGiftForm({ ...emptyGift, unlock: { ...emptyGift.unlock } })
     setGiftError('')
@@ -183,6 +225,7 @@ export default function Admin() {
   }
 
   const openGiftEdit = (gift) => {
+    resetGiftImageDraft()
     setEditingGift(gift)
     setGiftForm({
       name: gift.name,
@@ -192,6 +235,7 @@ export default function Admin() {
       budget: gift.budget === null || gift.budget === undefined ? '' : String(gift.budget),
       avatar: !!gift.avatar,
       image: gift.image || '',
+      imageMediaId: gift.imageMediaId || null,
       desc: gift.desc || '',
       unlock: {
         type: gift.unlock?.type || 'none',
@@ -207,15 +251,24 @@ export default function Admin() {
     setGiftForm((g) => ({ ...g, unlock: { ...g.unlock, [key]: value } }))
   }
 
-  const submitGift = () => {
-    const res = saveGift(giftForm, editingGift?.id)
-    if (!res.ok) {
-      setGiftError(res.message)
-      return
-    }
+  const submitGift = async () => {
+    if (giftSaving) return
+    setGiftSaving(true)
     setGiftError('')
-    toast(editingGift ? '礼品信息已更新并同步至商城' : '礼品已新增并默认上架', 'success')
-    setGiftOpen(false)
+    try {
+      const res = await saveGift(giftForm, editingGift?.id, giftImageFile)
+      if (!res.ok) {
+        setGiftError(res.message)
+        return
+      }
+      toast(editingGift ? '礼品信息已更新并同步至商城' : '礼品已新增并默认上架', 'success')
+      resetGiftImageDraft()
+      setGiftOpen(false)
+    } catch {
+      setGiftError('保存失败，请重试')
+    } finally {
+      setGiftSaving(false)
+    }
   }
 
   const handleGiftShelf = (gift, isOnShelf) => {
@@ -611,7 +664,7 @@ export default function Admin() {
             {gifts.map((gift) => (
               <div key={gift.id} className={`gift-admin-row ${gift.isOnShelf === false ? 'off-shelf' : ''}`}>
                 <div className="gift-admin-top">
-                  <ImageWithFallback src={gift.image} alt={gift.name} className="gift-admin-img" />
+                  <GiftImage gift={gift} alt={gift.name} className="gift-admin-img" />
                   <div className="gift-admin-main">
                     <div className="gift-admin-heading">
                       <b>{gift.name}</b>
@@ -802,16 +855,16 @@ export default function Admin() {
 
       <Sheet
         open={giftOpen}
-        onClose={() => setGiftOpen(false)}
+        onClose={closeGift}
         title={editingGift ? '编辑礼品' : '新增礼品'}
         subtitle={editingGift ? '修改后立即同步至商城，上下架状态保持不变' : '新礼品保存后默认上架'}
         footer={
-          <button className="btn btn-primary full" onClick={submitGift}>
-            {editingGift ? '保存修改' : '新增并上架'}
+          <button className="btn btn-primary full" onClick={submitGift} disabled={giftSaving}>
+            {giftSaving ? '保存中…' : editingGift ? '保存修改' : '新增并上架'}
           </button>
         }
       >
-        <div className="gift-form">
+        <fieldset className="gift-form" disabled={giftSaving}>
           <Field label="礼品类型" required hint={editingGift ? '为保护历史订单与权益，编辑时不可更换类型' : '新增后礼品类型不可更换'}>
             <select value={giftForm.type} disabled={!!editingGift} onChange={(e) => updateGift('type', e.target.value)}>
               <option value="physical">实物礼品</option>
@@ -837,21 +890,30 @@ export default function Admin() {
               onChange={(e) => updateGift('cost', e.target.value)}
             />
           </Field>
-          <Field label="图片地址" required hint="支持 https:// 图片 URL 或本站 / 开头资源路径">
-            <input
-              type="text"
-              maxLength={2048}
-              placeholder="https://example.com/gift.png"
-              value={giftForm.image}
-              onChange={(e) => updateGift('image', e.target.value)}
-            />
-          </Field>
-          {giftForm.image ? (
+          <div className="field gift-image-field">
+            <span className="field-label">礼品图片（必选）</span>
             <div className="gift-image-preview">
-              <ImageWithFallback src={giftForm.image.trim()} alt="礼品图片预览" className="gift-image-preview-img" />
-              <span>图片预览</span>
+              {giftImagePreviewUrl ? (
+                <ImageWithFallback src={giftImagePreviewUrl} alt="新选礼品图片预览" className="gift-image-preview-img" />
+              ) : giftForm.imageMediaId || giftForm.image ? (
+                <GiftImage gift={giftForm} alt="当前礼品图片" className="gift-image-preview-img" />
+              ) : (
+                <span className="gift-image-preview-img gift-image-empty"><ImagePlus size={24} /></span>
+              )}
+              <span>{giftImagePreviewUrl ? `已选择：${giftImageFile?.name || '拍照图片'}` : giftForm.imageMediaId || giftForm.image ? '当前图片，可重新选择' : '请选择图片或拍照'}</span>
             </div>
-          ) : null}
+            <input ref={giftAlbumRef} type="file" accept="image/*" hidden onChange={handleGiftImage} />
+            <input ref={giftCameraRef} type="file" accept="image/*" capture="environment" hidden onChange={handleGiftImage} />
+            <div className="upload-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => giftAlbumRef.current?.click()}>
+                <ImagePlus size={17} /> {giftImagePreviewUrl ? '重新选择' : '相册选择'}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => giftCameraRef.current?.click()}>
+                <Camera size={17} /> {giftImagePreviewUrl ? '重新拍照' : '拍照'}
+              </button>
+            </div>
+            <span className="field-hint">图片仅保存在本机，保存后可在商城和订单中显示</span>
+          </div>
           <Field label="礼品说明" hint="选填，不超过 120 个字">
             <textarea
               rows={3}
@@ -916,7 +978,7 @@ export default function Admin() {
             </Field>
           ) : null}
           {giftError ? <p className="form-error">{giftError}</p> : null}
-        </div>
+        </fieldset>
       </Sheet>
 
       <Modal

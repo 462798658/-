@@ -124,8 +124,16 @@ export function MediaImage({ mediaId, alt = '', className = '', fallback = null 
 
 export function ImageWithFallback({ src, alt = '', className = '', fallback = null }) {
   const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [src])
   if (!src || failed) return fallback || <div className={`media-placeholder ${className}`} />
   return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setFailed(true)} />
+}
+
+export function GiftImage({ gift, alt = '', className = '', fallback = null }) {
+  if (gift?.imageMediaId) {
+    return <MediaImage mediaId={gift.imageMediaId} alt={alt} className={className} fallback={fallback} />
+  }
+  return <ImageWithFallback src={gift?.image} alt={alt} className={className} fallback={fallback} />
 }
 
 export function Badge({ children, tone = 'neutral', className = '' }) {

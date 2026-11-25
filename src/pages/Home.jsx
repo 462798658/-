@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { Badge, Card, ProgressBar, Ring, SectionTitle } from '../components/ui'
+import { Badge, Card, MediaImage, ProgressBar, Ring, SectionTitle } from '../components/ui'
 import { formatDateCN, greeting, shiftKey, todayKey, weekdayCN } from '../lib/utils'
 import { nextLadderInfo, homeworkProgress } from '../lib/domain'
 
@@ -56,7 +56,13 @@ export default function Home() {
           </h1>
         </div>
         <button className="avatar-btn" onClick={() => navigate('/profile')} aria-label="个人中心">
-          {user.avatar ? <img src={user.avatar} alt={user.nickname} /> : <span>{initial}</span>}
+          {user.avatarMediaId ? (
+            <MediaImage mediaId={user.avatarMediaId} alt={user.nickname} fallback={<span>{initial}</span>} />
+          ) : user.avatar ? (
+            <img src={user.avatar} alt={user.nickname} />
+          ) : (
+            <span>{initial}</span>
+          )}
         </button>
       </header>
 

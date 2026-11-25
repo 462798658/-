@@ -5408,6 +5408,31 @@ p {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.gift-form:disabled {
+  opacity: 0.75;
+}
+
+.gift-image-field {
+  gap: 9px;
+}
+
+.gift-image-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.gift-image-preview > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 .gift-form-grid {

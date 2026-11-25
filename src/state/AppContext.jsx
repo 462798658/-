@@ -17,7 +17,7 @@ import {
   todayKey,
   uid,
 } from '../lib/utils'
-import { clearMedia } from '../lib/media'
+import { clearMedia, deleteMedia, putMedia } from '../lib/media'
 
 const AppCtx = createContext(null)
 
@@ -200,6 +200,7 @@ export function AppProvider({ children }) {
           password,
           nickname: nickname.trim().slice(0, 12),
           avatar: null,
+          avatarMediaId: null,
           role: 'student',
           points: 0,
           streakDays: 0,
@@ -305,7 +306,10 @@ export function AppProvider({ children }) {
     const draft = structuredClone(state)
     const me = draft.users.find((u) => u.id === user.id)
     me.ownedAvatars = [...(me.ownedAvatars || []), gift.id]
-    if (gift.avatar) me.avatar = gift.image
+    if (gift.avatar) {
+      me.avatarMediaId = gift.imageMediaId || null
+      me.avatar = gift.imageMediaId ? null : gift.image
+    }
     const order = {
       id: uid('od'),
       userId: user.id,
@@ -636,13 +640,28 @@ export function AppProvider({ children }) {
     return { ok: true }
   }
 
-  const saveGift = (form, id) => {
+  const saveGift = async (form, id, imageFile = null) => {
     if (!user || user.role !== 'admin') return { ok: false, message: '无权限管理礼品' }
-    const error = validateGiftForm(form)
+    if (imageFile && !imageFile.type?.startsWith('image/')) return { ok: false, message: '请选择图片文件' }
+    const error = validateGiftForm(form, { hasNewImage: !!imageFile })
     if (error) return { ok: false, message: error }
+    const existing = id ? state.gifts.find((g) => g.id === id) : null
+    if (id && !existing) return { ok: false, message: '礼品不存在' }
+
+    let newMediaId = null
+    if (imageFile) {
+      newMediaId = uid('media')
+      try {
+        await putMedia(imageFile, newMediaId)
+      } catch {
+        return { ok: false, message: '图片写入本地存储失败，请检查存储空间后重试' }
+      }
+    }
+
     const draft = structuredClone(state)
     const target = id ? draft.gifts.find((g) => g.id === id) : null
-    if (id && !target) return { ok: false, message: '礼品不存在' }
+    const previousMediaId = target?.imageMediaId || null
+    const imageMediaId = newMediaId || previousMediaId
     const type = target?.type || form.type
     const unlock = form.unlock || { type: 'none' }
     const values = {
@@ -652,7 +671,8 @@ export function AppProvider({ children }) {
       stock: type === 'physical' ? Number(form.stock) : null,
       budget: type === 'physical' ? Number(form.budget) : null,
       avatar: type === 'virtual' ? !!form.avatar : false,
-      image: form.image.trim(),
+      image: imageMediaId ? '' : (form.image || '').trim(),
+      imageMediaId,
       desc: (form.desc || '').trim(),
       unlock: {
         type: unlock.type,
@@ -672,6 +692,15 @@ export function AppProvider({ children }) {
       })
     }
     setState(draft)
+    if (
+      previousMediaId &&
+      newMediaId &&
+      previousMediaId !== newMediaId &&
+      !draft.gifts.some((g) => g.imageMediaId === previousMediaId) &&
+      !draft.users.some((u) => u.avatarMediaId === previousMediaId)
+    ) {
+      deleteMedia(previousMediaId).catch(() => {})
+    }
     return { ok: true }
   }
 
@@ -689,7 +718,8 @@ export function AppProvider({ children }) {
 
   const deleteGift = (id) => {
     if (!user || user.role !== 'admin') return { ok: false, message: '无权限管理礼品' }
-    if (!state.gifts.some((g) => g.id === id)) return { ok: false, message: '礼品不存在' }
+    const target = state.gifts.find((g) => g.id === id)
+    if (!target) return { ok: false, message: '礼品不存在' }
     const references = []
     if (state.orders.some((o) => o.giftId === id)) references.push('兑换订单')
     if (state.ladders.some((l) => l.giftId === id)) references.push('打卡阶梯')
@@ -700,6 +730,13 @@ export function AppProvider({ children }) {
     const draft = structuredClone(state)
     draft.gifts = draft.gifts.filter((g) => g.id !== id)
     setState(draft)
+    if (
+      target.imageMediaId &&
+      !draft.gifts.some((g) => g.imageMediaId === target.imageMediaId) &&
+      !draft.users.some((u) => u.avatarMediaId === target.imageMediaId)
+    ) {
+      deleteMedia(target.imageMediaId).catch(() => {})
+    }
     return { ok: true }
   }
 

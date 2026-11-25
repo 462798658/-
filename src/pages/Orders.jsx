@@ -12,7 +12,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { Badge, EmptyState, ImageWithFallback, MediaImage, PageHeader, Segmented, Sheet } from '../components/ui'
+import { Badge, EmptyState, GiftImage, MediaImage, PageHeader, Segmented, Sheet } from '../components/ui'
 import { formatDateTime } from '../lib/utils'
 
 const FILTERS = [
@@ -94,7 +94,7 @@ export default function Orders() {
                     {custom ? (
                       <MediaImage mediaId={custom.screenshotMediaId} fallback={<Gift size={20} />} />
                     ) : (
-                      <ImageWithFallback src={gift?.image} alt={order.giftName} fallback={<Gift size={20} />} />
+                      <GiftImage gift={gift} alt={order.giftName} fallback={<Gift size={20} />} />
                     )}
                   </span>
                   <div className="order-main">

@@ -92,7 +92,7 @@ export const makeDefaultGifts = () => [
     desc: '解锁最高打卡阶梯后开放，可自选 100 元以内心仪好物。',
     unlock: { type: 'ladderMax' },
   },
-].map((gift) => ({ isOnShelf: true, ...gift }))
+].map((gift) => ({ isOnShelf: true, imageMediaId: null, ...gift }))
 
 export const makeDefaultLadders = () => [
   {
@@ -232,15 +232,17 @@ export function validateHomeworkForm(form) {
   return null
 }
 
-export function validateGiftForm(form) {
+export function validateGiftForm(form, { hasNewImage = false } = {}) {
   if (!form.name || !form.name.trim()) return '请填写礼品名称'
   if (form.name.trim().length > 30) return '礼品名称不超过 30 个字'
   if (!['virtual', 'physical'].includes(form.type)) return '请选择正确的礼品类型'
   if (!isIntInRange(form.cost, 1, 1000000)) return '兑换积分需为 1-1000000 的正整数'
   const image = (form.image || '').trim()
-  if (!image) return '请填写礼品图片地址'
-  if (image.length > 2048 || !(/^https:\/\/\S+$/.test(image) || /^\/(?!\/)\S+$/.test(image))) {
-    return '图片地址需为有效的 https:// URL 或本站 / 开头路径'
+  if (!hasNewImage && !form.imageMediaId) {
+    if (!image) return '请选择礼品图片'
+    if (image.length > 2048 || !(/^https:\/\/\S+$/.test(image) || /^\/(?!\/)\S+$/.test(image))) {
+      return '原图片地址无效，请重新选择图片'
+    }
   }
   if ((form.desc || '').length > 120) return '礼品说明不超过 120 个字'
   if (form.type === 'physical') {

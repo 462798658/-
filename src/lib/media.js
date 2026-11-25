@@ -54,6 +54,20 @@ export async function getMediaUrl(id) {
   return url
 }
 
+export async function deleteMedia(id) {
+  if (!id) return
+  const db = await openDB()
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    tx.objectStore(STORE).delete(id)
+    tx.oncomplete = resolve
+    tx.onerror = () => reject(tx.error)
+  })
+  const cached = urlCache.get(id)
+  if (cached) URL.revokeObjectURL(cached)
+  urlCache.delete(id)
+}
+
 export async function clearMedia() {
   const db = await openDB()
   await new Promise((resolve, reject) => {

@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { Badge, ListRow, Modal, PageHeader, Sheet } from '../components/ui'
+import { Badge, ListRow, MediaImage, Modal, PageHeader, Sheet } from '../components/ui'
 import { formatDateCN } from '../lib/utils'
 
 export default function Profile() {
@@ -46,7 +46,13 @@ export default function Profile() {
         <div className="profile-glow" />
         <div className="profile-top">
           <div className="profile-avatar">
-            {user.avatar ? <img src={user.avatar} alt={user.nickname} /> : <span>{initial}</span>}
+            {user.avatarMediaId ? (
+              <MediaImage mediaId={user.avatarMediaId} alt={user.nickname} fallback={<span>{initial}</span>} />
+            ) : user.avatar ? (
+              <img src={user.avatar} alt={user.nickname} />
+            ) : (
+              <span>{initial}</span>
+            )}
             <i className="profile-avatar-ring" />
           </div>
           <div className="profile-info">

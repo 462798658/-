@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { Badge, EmptyState, ImageWithFallback, Modal, PageHeader, Segmented, Sheet } from '../components/ui'
+import { Badge, EmptyState, GiftImage, ImageWithFallback, Modal, PageHeader, Segmented, Sheet } from '../components/ui'
 import { giftUnlockText, isGiftUnlocked } from '../lib/domain'
 import { putMedia } from '../lib/media'
 import { uid } from '../lib/utils'
@@ -169,7 +169,7 @@ export default function Shop() {
     return (
       <button key={item.id} className={`gift-card ${item.custom ? 'ultimate' : ''}`} onClick={() => openGift(item.id)}>
         <span className="gift-media">
-          <ImageWithFallback src={item.image} alt={item.name} className="gift-img" />
+          <GiftImage gift={item} alt={item.name} className="gift-img" />
           <span className={`gift-type ${item.type}`}>{item.type === 'virtual' ? '虚拟' : '实物'}</span>
           {item.custom ? (
             <span className="gift-ultimate-tag">
@@ -273,7 +273,7 @@ export default function Shop() {
         {gift ? (
           <div className="gift-detail">
             <div className="gift-detail-media">
-              <ImageWithFallback src={gift.image} alt={gift.name} className="gift-detail-img" />
+              <GiftImage gift={gift} alt={gift.name} className="gift-detail-img" />
             </div>
             <div className="gift-detail-tags">
               <Badge tone={gift.type === 'virtual' ? 'mint' : 'sky'}>{gift.type === 'virtual' ? '虚拟礼品' : '实物礼品'}</Badge>
@@ -437,7 +437,7 @@ export default function Shop() {
       >
         {gift ? (
           <div className="confirm-gift">
-            <ImageWithFallback src={gift.image} alt={gift.name} className="confirm-gift-img" />
+            <GiftImage gift={gift} alt={gift.name} className="confirm-gift-img" />
             <div>
               <b>{gift.name}</b>
               <span>{gift.avatar ? '兑换后自动应用为头像' : '兑换后自动发放至账户'}</span>
@@ -511,7 +511,7 @@ export default function Shop() {
             </div>
             {success.kind === 'virtual' && success.gift?.avatar ? (
               <div className="avatar-preview">
-                <img src={success.gift.image} alt="新头像" />
+                <GiftImage gift={success.gift} alt="新头像" />
                 <span>已应用为你的新头像</span>
               </div>
             ) : null}
