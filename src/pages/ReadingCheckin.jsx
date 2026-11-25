@@ -92,12 +92,47 @@ export default function ReadingCheckin() {
       return
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-      streamRef.current = stream
-      if (liveRef.current) {
-        liveRef.current.srcObject = stream
-        await liveRef.current.play().catch(() => {})
+      // 荣耀等国产 Android WebView 上，getUserMedia 会弹权限框，
+      // await 之后用户手势上下文丢失 → video.play() 被 autoplay policy 拦截。
+      // 这里把 MediaRecorder 的启动和 stream 设置分开处理，
+      // play() 用 fire-and-forget 并且 video 带 muted+autoplay 属性来绕过限制。
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      })
+      if (stream.getVideoTracks().length === 0) {
+        throw new Error('no video track')
       }
+      streamRef.current = stream
+
+      // 关键：先触发 re-render（让 React 把 <video> 挂好），再在下一帧设 srcObject
+      setRecording(true)
+      setRecordTiming(true)
+      setCameraError(false)
+
+      requestAnimationFrame(() => {
+        const v = liveRef.current
+        if (!v) return
+        v.srcObject = stream
+        v.muted = true
+        v.setAttribute('muted', '')
+        v.setAttribute('autoplay', '')
+        // Android WebView 上 muted 的视频应该能自动播
+        // 用 fire-and-forget 避免 await 再次丢上下文
+        const p = v.play()
+        if (p && typeof p.then === 'function') {
+          p.catch(() => {
+            // play 被拦截（不是 muted 的问题就是别的），
+            // 等下一个 tick 再试一次
+            setTimeout(() => {
+              if (!liveRef.current || !liveRef.current.srcObject) return
+              liveRef.current.play().catch(() => {})
+            }, 300)
+          })
+        }
+      })
+
+      // MediaRecorder 也等一下 stream 完全就绪
       const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
       const mimeType = candidates.find((t) => MediaRecorder.isTypeSupported?.(t))
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 900000 } : undefined)
@@ -113,10 +148,8 @@ export default function ReadingCheckin() {
       }
       recorder.start(500)
       recorderRef.current = recorder
-      setRecording(true)
-      setRecordTiming(true)
-      setCameraError(false)
     } catch (err) {
+      console.error('[RECORD] getUserMedia failed:', err)
       setCameraError(true)
       toast('无法访问摄像头，可使用「模拟录制」体验流程', 'error')
     }
@@ -313,7 +346,16 @@ export default function ReadingCheckin() {
           <>
             {recording && !simulated ? (
               <div className="live-wrap">
-                <video ref={liveRef} muted playsInline autoPlay className="live-video" />
+                <video
+                  ref={liveRef}
+                  muted
+                  playsInline
+                  autoPlay
+                  playsinline=""
+                  webkit-playsinline="true"
+                  x5-playsinline="true"
+                  className="live-video"
+                />
                 <span className="live-flag">● REC</span>
               </div>
             ) : previewUrl ? (
