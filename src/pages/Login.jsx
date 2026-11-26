@@ -1,68 +1,35 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  GraduationCap,
-  LockKeyhole,
-  Phone,
-  ShieldCheck,
-  Sparkles,
-  UserRound,
-} from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, GraduationCap, LockKeyhole, Sparkles, UserRound } from 'lucide-react'
 import { useApp } from '../state/AppContext'
-import { ADMIN_PASSWORD, ADMIN_PHONE, DEMO_PASSWORD, DEMO_PHONE } from '../lib/domain'
+import { ADMIN_ACCOUNT, ADMIN_PASSWORD, DEMO_ACCOUNT, DEMO_PASSWORD } from '../lib/domain'
 import { Segmented } from '../components/ui'
 
 const TABS = [
-  { value: 'code', label: '验证码登录' },
-  { value: 'password', label: '密码登录' },
+  { value: 'login', label: '账号登录' },
   { value: 'register', label: '注册' },
 ]
 
 export default function Login() {
-  const { user, loginWithCode, loginWithPassword, register, sendCode, toast } = useApp()
+  const { user, loginWithAccount, register, toast } = useApp()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('code')
-  const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('')
+  const [tab, setTab] = useState('login')
+  const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [showPwd, setShowPwd] = useState(false)
-  const [countdown, setCountdown] = useState(0)
-
-  useEffect(() => {
-    if (countdown <= 0) return undefined
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [countdown])
 
   if (user) return <Navigate to="/" replace />
 
   const switchTab = (next) => {
     setTab(next)
-    setCode('')
     setPassword('')
-  }
-
-  const handleSendCode = () => {
-    const result = sendCode(phone)
-    if (!result.ok) {
-      toast(result.message, 'error')
-      return
-    }
-    setCode(result.code)
-    setCountdown(60)
-    toast(`验证码已发送（演示已自动填入）：${result.code}`, 'success')
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    let result
-    if (tab === 'code') result = loginWithCode(phone, code)
-    else if (tab === 'password') result = loginWithPassword(phone, password)
-    else result = register({ phone, code, password, nickname })
+    const result =
+      tab === 'login' ? loginWithAccount(account, password) : register({ account, password, nickname })
     if (!result.ok) {
       toast(result.message, 'error')
       return
@@ -71,8 +38,8 @@ export default function Login() {
     navigate('/', { replace: true })
   }
 
-  const quickLogin = (p, pwd, label) => {
-    const result = loginWithPassword(p, pwd)
+  const quickLogin = (name, pwd, label) => {
+    const result = loginWithAccount(name, pwd)
     if (!result.ok) {
       toast(result.message, 'error')
       return
@@ -106,33 +73,17 @@ export default function Login() {
           <Segmented options={TABS} value={tab} onChange={switchTab} className="login-tabs" />
           <form onSubmit={handleSubmit} className="login-form">
             <label className="input-group">
-              <Phone size={18} />
+              <UserRound size={18} />
               <input
-                type="tel"
-                inputMode="numeric"
-                maxLength={11}
-                placeholder="请输入手机号"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                type="text"
+                maxLength={20}
+                autoCapitalize="none"
+                autoCorrect="off"
+                placeholder="请输入账号"
+                value={account}
+                onChange={(e) => setAccount(e.target.value.replace(/\s/g, ''))}
               />
             </label>
-
-            {tab !== 'password' ? (
-              <div className="input-group with-action">
-                <ShieldCheck size={18} />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="请输入验证码"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                />
-                <button type="button" className="code-btn" disabled={countdown > 0} onClick={handleSendCode}>
-                  {countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}
-                </button>
-              </div>
-            ) : null}
 
             {tab === 'register' ? (
               <label className="input-group">
@@ -147,20 +98,18 @@ export default function Login() {
               </label>
             ) : null}
 
-            {tab !== 'code' ? (
-              <label className="input-group with-action">
-                <LockKeyhole size={18} />
-                <input
-                  type={showPwd ? 'text' : 'password'}
-                  placeholder={tab === 'register' ? '设置登录密码（至少 6 位）' : '请输入登录密码'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button type="button" className="pwd-toggle" onClick={() => setShowPwd((v) => !v)}>
-                  {showPwd ? <EyeOff size={17} /> : <Eye size={17} />}
-                </button>
-              </label>
-            ) : null}
+            <label className="input-group with-action">
+              <LockKeyhole size={18} />
+              <input
+                type={showPwd ? 'text' : 'password'}
+                placeholder={tab === 'register' ? '设置登录密码（至少 6 位）' : '请输入登录密码'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button type="button" className="pwd-toggle" onClick={() => setShowPwd((v) => !v)}>
+                {showPwd ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </label>
 
             <button type="submit" className="btn btn-primary full login-submit">
               {tab === 'register' ? '注册并登录' : '登录'}
@@ -168,11 +117,9 @@ export default function Login() {
             </button>
           </form>
           <p className="login-tip">
-            {tab === 'code'
-              ? '未注册的手机号请先切换到「注册」，注册时设置登录密码。'
-              : tab === 'password'
-                ? '学员与管理员均可使用手机号 + 密码登录。'
-                : '注册成功后自动登录，初始积分为 0。'}
+            {tab === 'login'
+              ? '使用账号 + 密码登录，学员与管理员均可使用。'
+              : '账号需为 3-20 位字母、数字或下划线，注册成功后自动登录，初始积分为 0。'}
           </p>
         </div>
 
@@ -181,25 +128,25 @@ export default function Login() {
             <span>演示账号</span>
             <em>点击一键登录</em>
           </div>
-          <button type="button" className="demo-row" onClick={() => quickLogin(DEMO_PHONE, DEMO_PASSWORD, '学员')}>
+          <button type="button" className="demo-row" onClick={() => quickLogin(DEMO_ACCOUNT, DEMO_PASSWORD, '学员')}>
             <span className="demo-avatar student">满</span>
             <span className="demo-info">
               <b>学员 · 陈小满</b>
               <i>连续打卡 36 天 · 积分可兑换</i>
             </span>
             <span className="demo-go">
-              {DEMO_PHONE}
+              {DEMO_ACCOUNT}
               <ArrowRight size={14} />
             </span>
           </button>
-          <button type="button" className="demo-row" onClick={() => quickLogin(ADMIN_PHONE, ADMIN_PASSWORD, '管理员')}>
+          <button type="button" className="demo-row" onClick={() => quickLogin(ADMIN_ACCOUNT, ADMIN_PASSWORD, '管理员')}>
             <span className="demo-avatar admin">师</span>
             <span className="demo-info">
               <b>管理员 · 李老师</b>
               <i>规则配置 · 兑换审核</i>
             </span>
             <span className="demo-go">
-              {ADMIN_PHONE}
+              {ADMIN_ACCOUNT}
               <ArrowRight size={14} />
             </span>
           </button>

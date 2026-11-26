@@ -10,6 +10,8 @@ export const ADMIN_PHONE = '13800000000'
 export const ADMIN_PASSWORD = 'admin123'
 export const DEMO_PHONE = '13812345678'
 export const DEMO_PASSWORD = '123456'
+export const ADMIN_ACCOUNT = 'admin'
+export const DEMO_ACCOUNT = 'student'
 
 const img = (prompt) =>
   `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${encodeURIComponent(prompt)}&image_size=square_hd`

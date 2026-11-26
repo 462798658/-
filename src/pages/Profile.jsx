@@ -57,7 +57,7 @@ export default function Profile() {
           </div>
           <div className="profile-info">
             <h2>{user.nickname}</h2>
-            <p>{user.phone}</p>
+            <p>账号：{user.account}</p>
             <div className="profile-badges">
               <Badge tone={user.role === 'admin' ? 'amber' : 'primary'}>
                 {user.role === 'admin' ? '管理员' : '学员'}
@@ -176,7 +176,7 @@ export default function Profile() {
         <div className="settings-list">
           <div className="settings-row">
             <span>当前账号</span>
-            <b>{user.nickname} · {user.phone}</b>
+            <b>{user.nickname} · {user.account}</b>
           </div>
           <div className="settings-row">
             <span>角色</span>

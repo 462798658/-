@@ -1,6 +1,7 @@
 import {
+  ADMIN_ACCOUNT,
   ADMIN_PASSWORD,
-  ADMIN_PHONE,
+  DEMO_ACCOUNT,
   DEMO_PASSWORD,
   DEMO_PHONE,
   makeDefaultCalcConfig,
@@ -191,7 +192,7 @@ export function createSeedState() {
   const users = [
     {
       id: adminId,
-      phone: ADMIN_PHONE,
+      account: ADMIN_ACCOUNT,
       password: ADMIN_PASSWORD,
       nickname: '李老师',
       avatar: null,
@@ -207,7 +208,7 @@ export function createSeedState() {
     },
     {
       id: demoId,
-      phone: DEMO_PHONE,
+      account: DEMO_ACCOUNT,
       password: DEMO_PASSWORD,
       nickname: '陈小满',
       avatar: astroGift.image,

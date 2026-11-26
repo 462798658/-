@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { createSeedState, STORAGE_KEY } from '../lib/seed'
 import {
   extraFeatureMeta,
@@ -38,6 +38,12 @@ function loadState() {
         parsed.extraCheckins = parsed.extraCheckins || []
         parsed.extraClaims = parsed.extraClaims || []
         parsed.gifts = (parsed.gifts || []).map((gift) => ({ ...gift, isOnShelf: gift.isOnShelf !== false }))
+        parsed.users = (parsed.users || []).map((u) => ({
+          ...u,
+          account:
+            u.account ||
+            (u.phone === '13800000000' ? 'admin' : u.phone === '13812345678' ? 'student' : u.phone || u.id),
+        }))
         return parsed
       }
     }
@@ -135,7 +141,6 @@ export function AppProvider({ children }) {
   const [state, setState] = useState(loadState)
   const [toasts, setToasts] = useState([])
   const [celebration, setCelebration] = useState(null)
-  const codesRef = useRef({})
 
   useEffect(() => {
     try {
@@ -165,36 +170,24 @@ export function AppProvider({ children }) {
   }
 
   // ---------- auth ----------
-  const sendCode = (phone) => {
-    if (!/^1\d{10}$/.test(phone)) return { ok: false, message: '请输入正确的 11 位手机号' }
-    const code = String(Math.floor(100000 + Math.random() * 900000))
-    codesRef.current[phone] = code
-    return { ok: true, code }
-  }
-
-  const loginWithCode = (phone, code) => {
-    const target = state.users.find((u) => u.phone === phone)
-    if (!target) return { ok: false, message: '该手机号尚未注册，请先注册' }
-    if (!code) return { ok: false, message: '请输入验证码' }
-    if (codesRef.current[phone] !== code) return { ok: false, message: '验证码不正确，请重新获取' }
-    setState((prev) => ({ ...prev, session: target.id }))
-    delete codesRef.current[phone]
-    return { ok: true }
-  }
-
-  const loginWithPassword = (phone, password) => {
-    const target = state.users.find((u) => u.phone === phone)
-    if (!target) return { ok: false, message: '该手机号尚未注册' }
+  const loginWithAccount = (account, password) => {
+    const name = (account || '').trim()
+    const target = state.users.find((u) => (u.account || '').toLowerCase() === name.toLowerCase())
+    if (!target) return { ok: false, message: '账号不存在，请先注册' }
     if (!password) return { ok: false, message: '请输入登录密码' }
-    if (target.password !== password) return { ok: false, message: '手机号或密码错误' }
+    if (target.password !== password) return { ok: false, message: '账号或密码错误' }
     setState((prev) => ({ ...prev, session: target.id }))
     return { ok: true }
   }
 
-  const register = ({ phone, code, password, nickname }) => {
-    if (!/^1\d{10}$/.test(phone)) return { ok: false, message: '请输入正确的 11 位手机号' }
-    if (state.users.some((u) => u.phone === phone)) return { ok: false, message: '该手机号已注册，请直接登录' }
-    if (codesRef.current[phone] !== code) return { ok: false, message: '验证码不正确，请重新获取' }
+  const register = ({ account, password, nickname }) => {
+    const name = (account || '').trim()
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(name)) {
+      return { ok: false, message: '账号需为 3-20 位字母、数字或下划线' }
+    }
+    if (state.users.some((u) => (u.account || '').toLowerCase() === name.toLowerCase())) {
+      return { ok: false, message: '该账号已注册，请直接登录' }
+    }
     if (!password || password.length < 6) return { ok: false, message: '登录密码至少 6 位' }
     if (!nickname || !nickname.trim()) return { ok: false, message: '请填写昵称' }
     const id = uid('u')
@@ -205,7 +198,7 @@ export function AppProvider({ children }) {
         ...prev.users,
         {
           id,
-          phone,
+          account: name,
           password,
           nickname: nickname.trim().slice(0, 12),
           avatar: null,
@@ -221,7 +214,6 @@ export function AppProvider({ children }) {
         },
       ],
     }))
-    delete codesRef.current[phone]
     return { ok: true }
   }
 
@@ -1010,9 +1002,7 @@ export function AppProvider({ children }) {
     dismissToast,
     dismissCelebration,
     toast,
-    sendCode,
-    loginWithCode,
-    loginWithPassword,
+    loginWithAccount,
     register,
     logout,
     completeReading,
