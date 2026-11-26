@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock3,
   Film,
-  Gauge,
   Play,
   RotateCcw,
   Square,
@@ -27,7 +26,6 @@ export default function ReadingCheckin() {
 
   const [mode, setMode] = useState('record')
   const [elapsed, setElapsed] = useState(0)
-  const [demoSpeed, setDemoSpeed] = useState(false)
   const [recordTiming, setRecordTiming] = useState(false)
   const [recording, setRecording] = useState(false)
   const [cameraError, setCameraError] = useState(false)
@@ -77,10 +75,9 @@ export default function ReadingCheckin() {
 
   useEffect(() => {
     if (!timing) return undefined
-    const step = demoSpeed ? 60 : 1
-    const timer = setInterval(() => setElapsed((e) => e + step), 1000)
+    const timer = setInterval(() => setElapsed((e) => e + 1), 1000)
     return () => clearInterval(timer)
-  }, [timing, demoSpeed])
+  }, [timing])
 
   useEffect(() => {
     if (elapsed >= required && !reachedRef.current) {
@@ -335,11 +332,6 @@ export default function ReadingCheckin() {
           <span className="timer-divider" />
           <span>{timing ? (mode === 'record' ? '录制中' : '观看中') : '已暂停'}</span>
         </div>
-        {demoSpeed ? (
-          <div className="demo-speed-on">
-            <Gauge size={15} /> 演示加速已开启（×60）
-          </div>
-        ) : null}
       </div>
 
       <div className="media-stage">
@@ -444,20 +436,6 @@ export default function ReadingCheckin() {
 
         <button className="btn btn-primary full submit-btn" disabled={!canSubmit} onClick={handleSubmit}>
           {submitting ? '正在保存…' : achieved ? `提交打卡 +${readingPoints} 积分` : `还差 ${Math.ceil((required - elapsed) / 60)} 分钟`}
-        </button>
-      </div>
-
-      <div className="demo-toggle card">
-        <div>
-          <b>演示加速</b>
-          <p>以 ×60 速度计时，便于快速体验完整打卡流程</p>
-        </div>
-        <button
-          className={`switch ${demoSpeed ? 'on' : ''}`}
-          onClick={() => setDemoSpeed((v) => !v)}
-          aria-label="切换演示加速"
-        >
-          <span />
         </button>
       </div>
 

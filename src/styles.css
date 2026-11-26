@@ -2056,19 +2056,6 @@ p {
   background: var(--line-strong);
 }
 
-.demo-speed-on {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 9px;
-  font-size: 10px;
-  color: var(--amber-deep);
-  background: var(--amber-soft);
-  padding: 4px 9px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-
 .media-stage {
   margin-top: 14px;
   border-radius: 20px;
@@ -2203,26 +2190,6 @@ p {
 
 .submit-btn {
   margin-top: 2px;
-}
-
-.demo-toggle {
-  margin-top: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 13px 14px;
-}
-
-.demo-toggle b {
-  font-size: 12.5px;
-}
-
-.demo-toggle p {
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 2px;
-  line-height: 1.45;
 }
 
 /* ============ reading done ============ */
