@@ -1,9 +1,14 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createSeedState, STORAGE_KEY } from '../lib/seed'
 import {
+  extraFeatureMeta,
+  extraMilestoneDefs,
   isGiftUnlocked,
   makeDefaultCalcConfig,
+  makeDefaultExtraConfig,
   makeDefaultReadingConfig,
+  mergeExtraConfig,
+  validateExtraConfigForm,
   validateGiftForm,
   validateHomeworkForm,
   validateLadderForm,
@@ -29,6 +34,9 @@ function loadState() {
       if (parsed && parsed.version === 1) {
         parsed.readingConfig = { ...makeDefaultReadingConfig(), ...(parsed.readingConfig || {}) }
         parsed.calcConfig = { ...makeDefaultCalcConfig(), ...(parsed.calcConfig || {}) }
+        parsed.extraConfig = mergeExtraConfig(makeDefaultExtraConfig(), parsed.extraConfig)
+        parsed.extraCheckins = parsed.extraCheckins || []
+        parsed.extraClaims = parsed.extraClaims || []
         parsed.gifts = (parsed.gifts || []).map((gift) => ({ ...gift, isOnShelf: gift.isOnShelf !== false }))
         return parsed
       }
@@ -66,7 +74,8 @@ function recomputeProgress(draft, userId) {
   if (!user) return { newLadders: [], newStages: [] }
   const readingDates = draft.readingCheckins.filter((r) => r.userId === userId).map((r) => r.date)
   const calcDates = draft.calcCheckins.filter((c) => c.userId === userId).map((c) => c.date)
-  const allDates = [...new Set([...readingDates, ...calcDates])].sort()
+  const extraDates = (draft.extraCheckins || []).filter((c) => c.userId === userId).map((c) => c.date)
+  const allDates = [...new Set([...readingDates, ...calcDates, ...extraDates])].sort()
   user.totalDays = allDates.length
   user.totalPages = draft.calcCheckins
     .filter((c) => c.userId === userId)
@@ -288,6 +297,243 @@ export function AppProvider({ children }) {
     setState(draft)
     notifyUnlocks(unlocks)
     return { ok: true, points: earned, record, passed, unlocks }
+  }
+
+  // ---------- 拓展打卡 ----------
+  const extraConfigOf = (key) => (state.extraConfig || {})[key] || {}
+
+  const isExtraUnlocked = (key) => {
+    const cfg = extraConfigOf(key)
+    if (!cfg.enabled) return false
+    return (user?.totalDays || 0) >= (cfg.unlockDays || 0)
+  }
+
+  const extraPagesTotal = (key) =>
+    user
+      ? state.extraCheckins
+          .filter((r) => r.userId === user.id && r.feature === key)
+          .reduce((s, r) => s + (r.pages || 0), 0)
+      : 0
+
+  const extraTodayRecords = (key) =>
+    user
+      ? state.extraCheckins.filter((r) => r.userId === user.id && r.feature === key && r.date === todayKey())
+      : []
+
+  const extraClaimed = (key, milestoneKey) =>
+    !!user &&
+    state.extraClaims.some((c) => c.userId === user.id && c.feature === key && c.milestoneKey === milestoneKey)
+
+  const completeExtra = (feature, payload = {}) => {
+    if (!user) return { ok: false, message: '请先登录' }
+    const meta = extraFeatureMeta(feature)
+    if (!meta) return { ok: false, message: '该打卡功能不存在' }
+    const cfg = extraConfigOf(feature)
+    if (!cfg.enabled) return { ok: false, message: '该功能暂未开放' }
+    if ((user.totalDays || 0) < cfg.unlockDays) {
+      return { ok: false, message: `打卡 ${cfg.unlockDays} 天解锁`, locked: true }
+    }
+    const today = todayKey()
+    const todayRecords = state.extraCheckins.filter(
+      (r) => r.userId === user.id && r.feature === feature && r.date === today,
+    )
+    if (todayRecords.length >= cfg.dailyLimit) {
+      return { ok: false, message: `今日已完成 ${cfg.dailyLimit} ${meta.unit}，明天再来吧` }
+    }
+
+    let pages = 0
+    let images = []
+    let mediaId = null
+    let neat = false
+    let lessonName = ''
+
+    if (feature === 'words' || feature === 'accumulation') {
+      images = Array.isArray(payload.images) ? payload.images.filter((x) => typeof x === 'string' && x) : []
+      if (!images.length) return { ok: false, message: '请上传默写图片' }
+      pages = images.length
+      neat = cfg.neatBonus > 0 && !!payload.neat
+    } else if (feature === 'recitation') {
+      lessonName = (payload.lessonName || '').trim()
+      if (!lessonName) return { ok: false, message: '请填写课文名称' }
+      lessonName = lessonName.slice(0, 20)
+      if (!payload.mediaId) return { ok: false, message: '请上传朗读视频' }
+      if (!payload.voiceClear) return { ok: false, message: '请确认朗读声音清晰' }
+      const duplicated = state.extraCheckins.some(
+        (r) => r.userId === user.id && r.feature === 'recitation' && (r.lessonName || '') === lessonName,
+      )
+      if (duplicated) return { ok: false, message: '该课文已朗读过，请更换课文（不能重复）' }
+      mediaId = payload.mediaId
+      pages = 1
+      neat = false
+    } else if (feature === 'rope') {
+      images = Array.isArray(payload.images) ? payload.images.filter((x) => typeof x === 'string' && x) : []
+      if (images.length !== cfg.groups) {
+        return { ok: false, message: `需上传 ${cfg.groups} 组照片，完成全部 ${cfg.groups} 组才能获得积分` }
+      }
+      pages = cfg.groups
+      neat = false
+    }
+
+    const basePoints = cfg.points || 0
+    const neatPoints = neat ? cfg.neatBonus : 0
+    const earned = basePoints + neatPoints
+    const draft = structuredClone(state)
+    const record = {
+      id: uid(`ex_${feature}`),
+      userId: user.id,
+      feature,
+      date: today,
+      pages,
+      images,
+      mediaId,
+      lessonName,
+      neatBonus: neatPoints,
+      points: earned,
+      createdAt: nowISO(),
+    }
+    draft.extraCheckins.unshift(record)
+    if (basePoints > 0) addPoints(draft, user.id, basePoints, `extra_${feature}`, meta.name, record.id)
+    if (neatPoints > 0) addPoints(draft, user.id, neatPoints, 'handwriting', '字迹奖励', record.id)
+    const unlocks = recomputeProgress(draft, user.id)
+    setState(draft)
+    notifyUnlocks(unlocks)
+    return { ok: true, points: earned, record, unlocks }
+  }
+
+  const claimExtraReward = (feature, milestoneKey, payload = {}) => {
+    if (!user) return { ok: false, message: '请先登录' }
+    const meta = extraFeatureMeta(feature)
+    if (!meta) return { ok: false, message: '该打卡功能不存在' }
+    const cfg = extraConfigOf(feature)
+    if (!cfg.enabled) return { ok: false, message: '该功能暂未开放' }
+    const defs = extraMilestoneDefs(state.extraConfig, feature)
+    const def = defs.find((d) => d.key === milestoneKey)
+    if (!def) return { ok: false, message: '奖励不存在' }
+    const pages = state.extraCheckins
+      .filter((r) => r.userId === user.id && r.feature === feature)
+      .reduce((s, r) => s + (r.pages || 0), 0)
+    if (pages < def.pages) return { ok: false, message: `累计还差 ${def.pages - pages} 页才能领取` }
+    if (state.extraClaims.some((c) => c.userId === user.id && c.feature === feature && c.milestoneKey === milestoneKey)) {
+      return { ok: false, message: '该奖励已领取' }
+    }
+
+    const draft = structuredClone(state)
+    const orderId = uid('od')
+
+    if (def.type === 'virtual') {
+      const order = {
+        id: orderId,
+        userId: user.id,
+        giftId: null,
+        giftName: `${meta.name} · ${def.pages}页虚拟礼品`,
+        giftType: 'virtual',
+        cost: 0,
+        status: '已发放',
+        createdAt: nowISO(),
+        reviewedAt: nowISO(),
+        completedAt: nowISO(),
+        remark: '拓展打卡里程碑虚拟礼品，系统自动发放',
+        source: 'extra',
+      }
+      draft.orders.unshift(order)
+      draft.extraClaims.unshift({
+        id: uid('ec'),
+        userId: user.id,
+        feature,
+        milestoneKey,
+        pages: def.pages,
+        type: 'virtual',
+        orderId,
+        createdAt: nowISO(),
+      })
+      setState(draft)
+      return { ok: true, order, type: 'virtual' }
+    }
+
+    // 终极大礼：100 元内自选商品，拍照上传下单兑换
+    const name = (payload.name || '').trim()
+    if (!name) return { ok: false, message: '请填写商品名称' }
+    const price = Number(payload.price)
+    if (!Number.isFinite(price) || price <= 0) return { ok: false, message: '请填写正确的商品价格' }
+    if (price > 100) return { ok: false, message: '超出预算，商品价格需在 100 元以内' }
+    if (!payload.screenshotMediaId) return { ok: false, message: '请上传商品截图' }
+    if (!payload.addressId) return { ok: false, message: '请选择收货地址' }
+    const address = state.addresses.find((a) => a.id === payload.addressId && a.userId === user.id)
+    if (!address) return { ok: false, message: '收货地址不存在，请重新选择' }
+
+    const customItemId = uid('ci')
+    const order = {
+      id: orderId,
+      userId: user.id,
+      giftId: null,
+      giftName: `自选商品 · ${name.slice(0, 30)}`,
+      giftType: 'physical',
+      cost: 0,
+      status: '待审核',
+      createdAt: nowISO(),
+      reviewedAt: null,
+      completedAt: null,
+      remark: '',
+      address: { ...address },
+      isCustom: true,
+      customItemId,
+      logisticsId: null,
+      source: 'extra',
+    }
+    const customItem = {
+      id: customItemId,
+      orderId,
+      userId: user.id,
+      name: name.slice(0, 30),
+      price,
+      screenshotMediaId: payload.screenshotMediaId,
+      link: (payload.link || '').trim(),
+      status: '待审核',
+      createdAt: nowISO(),
+    }
+    draft.orders.unshift(order)
+    draft.customItems.unshift(customItem)
+    draft.extraClaims.unshift({
+      id: uid('ec'),
+      userId: user.id,
+      feature,
+      milestoneKey,
+      pages: def.pages,
+      type: 'ultimate',
+      orderId,
+      createdAt: nowISO(),
+    })
+    setState(draft)
+    return { ok: true, order, type: 'ultimate' }
+  }
+
+  const saveExtraConfig = (feature, form) => {
+    if (!user || user.role !== 'admin') return { ok: false, message: '无权限修改规则' }
+    const meta = extraFeatureMeta(feature)
+    if (!meta) return { ok: false, message: '该打卡功能不存在' }
+    const error = validateExtraConfigForm(meta, form)
+    if (error) return { ok: false, message: error }
+    const draft = structuredClone(state)
+    const next = {
+      enabled: form.enabled !== false,
+      unlockDays: Number(form.unlockDays),
+      dailyLimit: Number(form.dailyLimit),
+      points: Number(form.points),
+      ...(meta.hasNeat ? { neatBonus: Number(form.neatBonus) } : {}),
+      ...(feature === 'rope' ? { groups: Number(form.groups) } : {}),
+      ...(meta.hasPages && form.milestones
+        ? {
+            milestones: {
+              virtual1: Number(form.milestones.virtual1),
+              virtual2: Number(form.milestones.virtual2),
+              ultimate: Number(form.milestones.ultimate),
+            },
+          }
+        : {}),
+    }
+    draft.extraConfig = { ...draft.extraConfig, [feature]: next, updatedAt: nowISO() }
+    setState(draft)
+    return { ok: true }
   }
 
   // ---------- gifts & orders ----------
@@ -771,6 +1017,13 @@ export function AppProvider({ children }) {
     logout,
     completeReading,
     completeCalc,
+    completeExtra,
+    claimExtraReward,
+    saveExtraConfig,
+    isExtraUnlocked,
+    extraPagesTotal,
+    extraTodayRecords,
+    extraClaimed,
     redeemVirtual,
     redeemPhysical,
     reviewOrder,

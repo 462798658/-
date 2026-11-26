@@ -10,6 +10,9 @@ import ReadingCheckin from './pages/ReadingCheckin'
 import ReadingHistory from './pages/ReadingHistory'
 import CalcCheckin from './pages/CalcCheckin'
 import CalcRecords from './pages/CalcRecords'
+import ExtraDictation from './pages/ExtraDictation'
+import ExtraRecitation from './pages/ExtraRecitation'
+import ExtraRope from './pages/ExtraRope'
 import Points from './pages/Points'
 import Shop from './pages/Shop'
 import Orders from './pages/Orders'
@@ -56,6 +59,10 @@ export default function App() {
               <Route path="/checkin/reading/history" element={<ReadingHistory />} />
               <Route path="/checkin/calc" element={<CalcCheckin />} />
               <Route path="/checkin/calc/records" element={<CalcRecords />} />
+              <Route path="/checkin/words" element={<ExtraDictation feature="words" />} />
+              <Route path="/checkin/accumulation" element={<ExtraDictation feature="accumulation" />} />
+              <Route path="/checkin/recitation" element={<ExtraRecitation />} />
+              <Route path="/checkin/rope" element={<ExtraRope />} />
               <Route path="/points" element={<Points />} />
               <Route path="/shop" element={<Shop />} />
               <Route path="/orders" element={<Orders />} />

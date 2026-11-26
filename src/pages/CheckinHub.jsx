@@ -1,16 +1,43 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Calculator, ChevronRight, Flame, ImageIcon, PlayCircle } from 'lucide-react'
+import {
+  Activity,
+  BookOpen,
+  Calculator,
+  ChevronRight,
+  Flame,
+  ImageIcon,
+  Lock,
+  Mic,
+  PenLine,
+  PlayCircle,
+} from 'lucide-react'
 import { useApp } from '../state/AppContext'
 import { Badge, Card, PageHeader, ProgressBar } from '../components/ui'
+import { EXTRA_FEATURES } from '../lib/domain'
 import { formatDateCN, todayKey } from '../lib/utils'
 
+const EXTRA_ICONS = {
+  words: PenLine,
+  accumulation: BookOpen,
+  recitation: Mic,
+  rope: Activity,
+}
+
+const EXTRA_ROUTES = {
+  words: '/checkin/words',
+  accumulation: '/checkin/accumulation',
+  recitation: '/checkin/recitation',
+  rope: '/checkin/rope',
+}
+
 export default function CheckinHub() {
-  const { state, user, todayReading, calcPagesToday } = useApp()
+  const { state, user, todayReading, calcPagesToday, toast, isExtraUnlocked, extraPagesTotal, extraTodayRecords } =
+    useApp()
   const navigate = useNavigate()
   if (!user) return null
 
-  const { readingConfig, calcConfig } = state
+  const { readingConfig, calcConfig, extraConfig } = state
   const readingDone = !!todayReading
   const calcDone = calcPagesToday >= calcConfig.dailyLimit
   const doneCount = (readingDone ? 1 : 0) + (calcDone ? 1 : 0)
@@ -101,6 +128,64 @@ export default function CheckinHub() {
           <ChevronRight size={16} />
         </span>
       </button>
+
+      <div className="section-title hub-extra-title">
+        <div>
+          <h2>拓展打卡</h2>
+          <p>随累计打卡天数逐步解锁，坚持越久玩法越多</p>
+        </div>
+      </div>
+
+      <div className="extra-entry-list">
+        {EXTRA_FEATURES.map((f) => {
+          const cfg = extraConfig?.[f.key]
+          if (!cfg || cfg.enabled === false) return null
+          const Icon = EXTRA_ICONS[f.key]
+          const unlocked = isExtraUnlocked(f.key)
+          const doneCount = extraTodayRecords(f.key).length
+          const done = doneCount >= cfg.dailyLimit
+          const pages = extraPagesTotal(f.key)
+          const handleClick = () => {
+            if (!unlocked) {
+              toast(`打卡 ${cfg.unlockDays} 天解锁`, 'default')
+              return
+            }
+            navigate(EXTRA_ROUTES[f.key])
+          }
+          return (
+            <button
+              key={f.key}
+              className={`entry-card extra ${f.key} ${!unlocked ? 'locked' : done ? 'done' : ''}`}
+              onClick={handleClick}
+            >
+              <span className="entry-icon">
+                {unlocked ? <Icon size={24} /> : <Lock size={22} />}
+              </span>
+              <span className="entry-main">
+                <span className="entry-title">{f.name}</span>
+                <span className="entry-desc">
+                  {!unlocked
+                    ? `打卡 ${cfg.unlockDays} 天解锁 · 当前 ${user.totalDays} 天`
+                    : f.hasPages
+                      ? `累计 ${pages} 页 · 今日 ${doneCount}/${cfg.dailyLimit} ${f.unit}`
+                      : `今日 ${doneCount}/${cfg.dailyLimit} 天 · 每组 300 个 + 长高操`}
+                </span>
+                <span className="entry-tags">
+                  <em>{
+                    { image: '图片上传', video: '视频上传' }[f.media]
+                  }</em>
+                  <em>每日 {cfg.dailyLimit} {f.unit}</em>
+                  <em>+{cfg.points} 积分</em>
+                </span>
+              </span>
+              <span className={`entry-cta ${!unlocked ? 'lock' : done ? 'ghost' : ''}`}>
+                {!unlocked ? '未解锁' : '去打卡'}
+                {unlocked ? <ChevronRight size={16} /> : <Lock size={14} />}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       <div className="hub-links">
         <button className="hub-link" onClick={() => navigate('/checkin/reading/history')}>

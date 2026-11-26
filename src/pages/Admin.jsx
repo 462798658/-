@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
 import { Badge, Field, GiftImage, ImageWithFallback, MediaImage, Modal, PageHeader, Sheet } from '../components/ui'
-import { giftUnlockText } from '../lib/domain'
+import { EXTRA_FEATURES, extraFeatureMeta, giftUnlockText } from '../lib/domain'
 import { formatDateTime, uid } from '../lib/utils'
 
 const TABS = [
@@ -35,9 +35,31 @@ const TABS = [
   { value: 'homework', label: '作业打卡' },
   { value: 'reading', label: '阅读打卡' },
   { value: 'calc', label: '计算打卡' },
+  { value: 'extra', label: '拓展打卡' },
   { value: 'gift', label: '礼品管理' },
   { value: 'review', label: '兑换审核' },
 ]
+
+const buildExtraForms = (config) => {
+  const out = {}
+  for (const f of EXTRA_FEATURES) {
+    const c = config?.[f.key] || {}
+    out[f.key] = {
+      enabled: c.enabled !== false,
+      unlockDays: String(c.unlockDays ?? f.defaultUnlockDays),
+      dailyLimit: String(c.dailyLimit ?? f.defaultDailyLimit),
+      points: String(c.points ?? f.defaultPoints),
+      neatBonus: String(c.neatBonus ?? f.defaultNeatBonus),
+      groups: String(c.groups ?? f.defaultGroups),
+      milestones: {
+        virtual1: String(c.milestones?.virtual1 ?? 30),
+        virtual2: String(c.milestones?.virtual2 ?? 60),
+        ultimate: String(c.milestones?.ultimate ?? 90),
+      },
+    }
+  }
+  return out
+}
 
 const emptyLadder = { days: '', name: '', desc: '', giftId: '' }
 const emptyGift = {
@@ -65,6 +87,7 @@ export default function Admin() {
     saveHomeworkConfig,
     saveReadingConfig,
     saveCalcConfig,
+    saveExtraConfig,
     reviewOrder,
     completeOrder,
     toast,
@@ -111,6 +134,10 @@ export default function Admin() {
     neatBonus: String(state.calcConfig.neatBonus),
   })
   const [calcError, setCalcError] = useState('')
+
+  const [extraTab, setExtraTab] = useState('words')
+  const [extraForms, setExtraForms] = useState(() => buildExtraForms(state.extraConfig))
+  const [extraError, setExtraError] = useState('')
 
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejectRemark, setRejectRemark] = useState('')
@@ -361,6 +388,26 @@ export default function Admin() {
     }
     setCalcError('')
     toast('计算打卡配置已保存，学员端实时生效', 'success')
+  }
+
+  const updateExtra = (key, field, value) =>
+    setExtraForms((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }))
+
+  const updateExtraMilestone = (key, field, value) =>
+    setExtraForms((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], milestones: { ...prev[key].milestones, [field]: value } },
+    }))
+
+  const submitExtra = (key) => {
+    const res = saveExtraConfig(key, extraForms[key])
+    if (!res.ok) {
+      setExtraError(res.message)
+      return
+    }
+    setExtraError('')
+    const meta = extraFeatureMeta(key)
+    toast(`${meta.name}配置已保存，学员端实时生效`, 'success')
   }
 
   const handleApprove = (order) => {
@@ -647,6 +694,147 @@ export default function Admin() {
           </button>
         </div>
       ) : null}
+
+      {tab === 'extra' ? (() => {
+        const eMeta = extraFeatureMeta(extraTab)
+        const eForm = extraForms[extraTab]
+        if (!eMeta || !eForm) return null
+        return (
+          <div className="admin-panel">
+            <div className="admin-panel-head">
+              <div>
+                <h2>拓展打卡设置</h2>
+                <p>配置解锁天数、每日次数、积分奖励与累计页数里程碑</p>
+              </div>
+            </div>
+
+            <div className="segmented extra-admin-tabs">
+              {EXTRA_FEATURES.map((f) => (
+                <button
+                  key={f.key}
+                  className={`segmented-item ${extraTab === f.key ? 'active' : ''}`}
+                  onClick={() => {
+                    setExtraTab(f.key)
+                    setExtraError('')
+                  }}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+
+            <label className="gift-avatar-option">
+              <input
+                type="checkbox"
+                checked={eForm.enabled}
+                onChange={(e) => updateExtra(extraTab, 'enabled', e.target.checked)}
+              />
+              <span>
+                <b>启用该功能</b>
+                <small>关闭后学员端不再展示此打卡入口</small>
+              </span>
+            </label>
+
+            <Field label="解锁所需累计打卡天数" hint="整数，范围 1-3650，累计打卡达到后解锁">
+              <input
+                type="number"
+                min="1"
+                max="3650"
+                value={eForm.unlockDays}
+                onChange={(e) => updateExtra(extraTab, 'unlockDays', e.target.value)}
+              />
+            </Field>
+            <Field label={`每日${eMeta.unit}次数上限`} hint="整数，范围 1-20">
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={eForm.dailyLimit}
+                onChange={(e) => updateExtra(extraTab, 'dailyLimit', e.target.value)}
+              />
+            </Field>
+            <Field label="单次打卡积分" hint="整数，范围 0-1000">
+              <input
+                type="number"
+                min="0"
+                max="1000"
+                value={eForm.points}
+                onChange={(e) => updateExtra(extraTab, 'points', e.target.value)}
+              />
+            </Field>
+            {eMeta.hasNeat ? (
+              <Field label="字迹工整额外奖励" hint="整数，范围 0-1000；字迹工整清晰时发放">
+                <input
+                  type="number"
+                  min="0"
+                  max="1000"
+                  value={eForm.neatBonus}
+                  onChange={(e) => updateExtra(extraTab, 'neatBonus', e.target.value)}
+                />
+              </Field>
+            ) : null}
+            {extraTab === 'rope' ? (
+              <Field label="每日跳绳组数" hint="整数，范围 1-20；须完成全部组数才获得积分">
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={eForm.groups}
+                  onChange={(e) => updateExtra(extraTab, 'groups', e.target.value)}
+                />
+              </Field>
+            ) : null}
+
+            {eMeta.hasPages ? (
+              <div className="extra-milestone-fields">
+                <p className="extra-milestone-label">累计页数里程碑奖励</p>
+                <div className="gift-form-grid">
+                  <Field label="虚拟礼品页数①" hint="0 表示关闭">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100000"
+                      value={eForm.milestones.virtual1}
+                      onChange={(e) => updateExtraMilestone(extraTab, 'virtual1', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="虚拟礼品页数②" hint="需大于前一项">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100000"
+                      value={eForm.milestones.virtual2}
+                      onChange={(e) => updateExtraMilestone(extraTab, 'virtual2', e.target.value)}
+                    />
+                  </Field>
+                  <Field label="终极大礼页数" hint="100 元内自选，需为最大">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100000"
+                      value={eForm.milestones.ultimate}
+                      onChange={(e) => updateExtraMilestone(extraTab, 'ultimate', e.target.value)}
+                    />
+                  </Field>
+                </div>
+              </div>
+            ) : null}
+
+            {extraError ? <p className="form-error">{extraError}</p> : null}
+
+            <div className="admin-preview">
+              <Layers size={16} />
+              <span>
+                累计打卡 <b>{eForm.unlockDays || '—'}</b> 天解锁，每日 <b>{eForm.dailyLimit || '—'}</b> {eMeta.unit}，每次 <b>+{eForm.points || '0'}</b> 积分
+                {eMeta.hasNeat ? <>，字迹额外 <b>+{eForm.neatBonus || '0'}</b></> : null}
+              </span>
+            </div>
+            <button className="btn btn-primary full" onClick={() => submitExtra(extraTab)}>
+              保存{eMeta.name}配置
+            </button>
+          </div>
+        )
+      })() : null}
 
       {tab === 'gift' ? (
         <div className="admin-panel">

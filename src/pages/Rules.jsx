@@ -1,13 +1,13 @@
 import React from 'react'
-import { BookOpen, Calculator, Coins, Gift, LockKeyhole, RefreshCcw, ScrollText, Sparkles, Target } from 'lucide-react'
+import { BookOpen, Calculator, Coins, Gift, Layers, LockKeyhole, RefreshCcw, ScrollText, Sparkles, Target } from 'lucide-react'
 import { useApp } from '../state/AppContext'
 import { Badge, PageHeader } from '../components/ui'
-import { homeworkProgress } from '../lib/domain'
+import { EXTRA_FEATURES, extraMilestoneDefs, homeworkProgress } from '../lib/domain'
 import { formatDateTime } from '../lib/utils'
 
 export default function Rules() {
   const { state } = useApp()
-  const { readingConfig, calcConfig, homeworkConfig, ladders, gifts } = state
+  const { readingConfig, calcConfig, homeworkConfig, ladders, gifts, extraConfig } = state
   const hw = homeworkProgress(homeworkConfig, 0)
 
   return (
@@ -148,6 +148,50 @@ export default function Rules() {
           })}
           {ladders.length === 0 ? <p className="rule-empty">管理员暂未配置阶梯奖励。</p> : null}
         </div>
+      </section>
+
+      <section className="rule-card card">
+        <div className="rule-card-head">
+          <span className="rule-icon mint">
+            <Layers size={19} />
+          </span>
+          <div>
+            <h3>拓展打卡</h3>
+            <p>随累计打卡天数解锁，默写与朗读积累页数换奖励</p>
+          </div>
+        </div>
+        <div className="rule-extra-list">
+          {EXTRA_FEATURES.map((f) => {
+            const cfg = extraConfig?.[f.key]
+            if (!cfg || cfg.enabled === false) return null
+            const defs = extraMilestoneDefs(extraConfig, f.key)
+            return (
+              <div key={f.key} className="rule-extra">
+                <div className="rule-extra-head">
+                  <b>{f.name}</b>
+                  <Badge tone="amber">打卡 {cfg.unlockDays} 天解锁</Badge>
+                </div>
+                <p>{f.desc}</p>
+                <div className="rule-extra-tags">
+                  <em>{f.media === 'video' ? '视频上传' : '图片上传'}</em>
+                  <em>每日 {cfg.dailyLimit} {f.unit}</em>
+                  <em>+{cfg.points} 积分</em>
+                  {f.hasNeat && cfg.neatBonus > 0 ? <em>字迹 +{cfg.neatBonus}</em> : null}
+                </div>
+                {defs.length ? (
+                  <div className="rule-extra-milestones">
+                    {defs.map((d) => (
+                      <span key={d.key}>
+                        {d.pages} 页 · {d.type === 'ultimate' ? '100 元内自选' : '虚拟礼品'}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
+        <p className="rule-note">拓展打卡需累计打卡达到解锁天数后开放，奖励按累计页数逐步解锁，管理员可实时调整。</p>
       </section>
 
       <section className="rule-card card">

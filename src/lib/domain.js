@@ -150,6 +150,147 @@ export const makeDefaultCalcConfig = () => ({
   updatedAt: new Date().toISOString(),
 })
 
+// ---------- 拓展打卡（词语默写 / 日积月累 / 读课文 / 跳绳） ----------
+export const EXTRA_FEATURES = [
+  {
+    key: 'words',
+    name: '词语表默写',
+    short: '词语默写',
+    unit: '课',
+    media: 'image',
+    icon: 'pen',
+    hasPages: true,
+    hasNeat: true,
+    defaultUnlockDays: 7,
+    defaultDailyLimit: 2,
+    defaultPoints: 5,
+    defaultNeatBonus: 1,
+    desc: '每次默写 1 课，每天最多 2 课',
+  },
+  {
+    key: 'accumulation',
+    name: '日积月累默写',
+    short: '日积月累',
+    unit: '单元',
+    media: 'image',
+    icon: 'book',
+    hasPages: true,
+    hasNeat: true,
+    repeatable: true,
+    defaultUnlockDays: 7,
+    defaultDailyLimit: 1,
+    defaultPoints: 5,
+    defaultNeatBonus: 1,
+    desc: '每天 1 个单元，可重复默写练习',
+  },
+  {
+    key: 'recitation',
+    name: '读课文',
+    short: '读课文',
+    unit: '课',
+    media: 'video',
+    icon: 'mic',
+    hasPages: true,
+    hasNeat: false,
+    readTwice: true,
+    defaultUnlockDays: 21,
+    defaultDailyLimit: 2,
+    defaultPoints: 5,
+    defaultNeatBonus: 0,
+    desc: '每次朗读 1 课，读两遍，每天最多 2 课，不可重复',
+  },
+  {
+    key: 'rope',
+    name: '跳绳',
+    short: '跳绳',
+    unit: '组',
+    media: 'image',
+    icon: 'rope',
+    hasPages: false,
+    hasNeat: false,
+    defaultUnlockDays: 30,
+    defaultDailyLimit: 1,
+    defaultPoints: 30,
+    defaultNeatBonus: 0,
+    defaultGroups: 5,
+    desc: '每天 5 组跳绳 + 长高操，每组 300 个',
+  },
+]
+
+export const extraFeatureMeta = (key) => EXTRA_FEATURES.find((f) => f.key === key) || null
+
+export const makeDefaultExtraConfig = () => {
+  const config = {}
+  for (const f of EXTRA_FEATURES) {
+    config[f.key] = {
+      enabled: true,
+      unlockDays: f.defaultUnlockDays,
+      dailyLimit: f.defaultDailyLimit,
+      points: f.defaultPoints,
+      neatBonus: f.defaultNeatBonus,
+      ...(f.key === 'rope'
+        ? { groups: f.defaultGroups }
+        : { milestones: { virtual1: 30, virtual2: 60, ultimate: 90 } }),
+    }
+  }
+  config.updatedAt = new Date().toISOString()
+  return config
+}
+
+// 旧数据兼容：逐项补齐缺省字段
+export function mergeExtraConfig(base, incoming) {
+  if (!incoming) return base
+  const merged = { ...base }
+  for (const f of EXTRA_FEATURES) {
+    const b = base[f.key]
+    const i = incoming[f.key] || {}
+    merged[f.key] = {
+      ...b,
+      ...i,
+      ...(b.milestones ? { milestones: { ...b.milestones, ...(i.milestones || {}) } } : {}),
+    }
+  }
+  merged.updatedAt = incoming.updatedAt || base.updatedAt
+  return merged
+}
+
+export function extraMilestoneDefs(config, feature) {
+  const cfg = config?.[feature]
+  if (!cfg || !cfg.milestones) return []
+  const { virtual1, virtual2, ultimate } = cfg.milestones
+  const list = []
+  if (Number(virtual1) > 0) {
+    list.push({ key: 'v1', pages: Number(virtual1), type: 'virtual', label: `${virtual1} 页 · 虚拟礼品` })
+  }
+  if (Number(virtual2) > 0) {
+    list.push({ key: 'v2', pages: Number(virtual2), type: 'virtual', label: `${virtual2} 页 · 虚拟礼品` })
+  }
+  if (Number(ultimate) > 0) {
+    list.push({ key: 'v3', pages: Number(ultimate), type: 'ultimate', label: `${ultimate} 页 · 终极自选奖励` })
+  }
+  return list
+}
+
+export function validateExtraConfigForm(meta, form) {
+  if (!isIntInRange(form.unlockDays, 1, 3650)) return '解锁天数需为 1-3650 的正整数'
+  if (!isIntInRange(form.dailyLimit, 1, 20)) return '每日次数上限需为 1-20 的正整数'
+  if (!isIntInRange(form.points, 0, 1000)) return '单次积分需为 0-1000 的整数'
+  if (meta.hasNeat && !isIntInRange(form.neatBonus, 0, 1000)) return '字迹工整奖励需为 0-1000 的整数'
+  if (meta.key === 'rope' && !isIntInRange(form.groups, 1, 20)) return '跳绳组数需为 1-20 的正整数'
+  if (meta.hasPages && form.milestones) {
+    const { virtual1, virtual2, ultimate } = form.milestones
+    for (const [label, value] of [['虚拟礼品 1', virtual1], ['虚拟礼品 2', virtual2], ['终极大礼', ultimate]]) {
+      if (!isIntInRange(value, 0, 100000)) return `${label}页数需为 0-100000 的整数`
+    }
+    const v1 = Number(virtual1)
+    const v2 = Number(virtual2)
+    const u = Number(ultimate)
+    if (v1 > 0 && v2 > 0 && v2 <= v1) return '第二个虚拟礼品页数需大于第一个'
+    if (u > 0 && u <= Math.max(v1, v2)) return '终极大礼页数需大于虚拟礼品页数'
+  }
+  return null
+}
+
 export function homeworkProgress(config, totalPages) {
   const target = config.totalPages
   const stages = [...(config.stages || [])].sort((a, b) => a.order - b.order)
