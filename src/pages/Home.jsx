@@ -1,6 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Activity,
   BookOpen,
   Calculator,
   ChevronRight,
@@ -8,6 +9,8 @@ import {
   Flame,
   Gift,
   History,
+  Mic,
+  PenLine,
   ScrollText,
   ShieldCheck,
   Sparkles,
@@ -15,15 +18,30 @@ import {
 import { useApp } from '../state/AppContext'
 import { Badge, Card, MediaImage, ProgressBar, Ring, SectionTitle } from '../components/ui'
 import { formatDateCN, greeting, shiftKey, todayKey, weekdayCN } from '../lib/utils'
-import { nextLadderInfo, homeworkProgress } from '../lib/domain'
+import { EXTRA_FEATURES, nextLadderInfo, homeworkProgress } from '../lib/domain'
+
+const EXTRA_ICONS = {
+  words: PenLine,
+  accumulation: BookOpen,
+  recitation: Mic,
+  rope: Activity,
+}
+
+const EXTRA_ROUTES = {
+  words: '/checkin/words',
+  accumulation: '/checkin/accumulation',
+  recitation: '/checkin/recitation',
+  rope: '/checkin/rope',
+}
 
 export default function Home() {
-  const { state, user, todayReading, todayCalc, calcPagesToday } = useApp()
+  const { state, user, todayReading, todayCalc, calcPagesToday, isExtraUnlocked, extraTodayRecords, extraPagesTotal } =
+    useApp()
   const navigate = useNavigate()
   if (!user) return null
 
   const today = todayKey()
-  const { readingConfig, calcConfig, ladders, homeworkConfig } = state
+  const { readingConfig, calcConfig, ladders, homeworkConfig, extraConfig } = state
   const readingDone = !!todayReading
   const calcDone = calcPagesToday >= calcConfig.dailyLimit
 
@@ -174,6 +192,38 @@ export default function Home() {
             {!calcDone && <ChevronRight size={15} />}
           </span>
         </button>
+
+        {EXTRA_FEATURES.map((f) => {
+          const cfg = extraConfig?.[f.key]
+          if (!cfg || cfg.enabled === false) return null
+          if (!isExtraUnlocked(f.key)) return null
+          const todayCount = extraTodayRecords(f.key).length
+          const done = todayCount >= cfg.dailyLimit
+          const Icon = EXTRA_ICONS[f.key]
+          return (
+            <button
+              key={f.key}
+              className={`task-card extra ${done ? 'done' : ''}`}
+              onClick={() => navigate(EXTRA_ROUTES[f.key])}
+            >
+              <span className={`task-icon ${f.key}`}>
+                <Icon size={22} />
+              </span>
+              <span className="task-body">
+                <span className="task-title">{f.name}</span>
+                <span className="task-desc">
+                  {f.hasPages
+                    ? `今日 ${todayCount}/${cfg.dailyLimit} ${f.unit} · 累计 ${extraPagesTotal(f.key)} 页`
+                    : `今日 ${todayCount}/${cfg.dailyLimit} 天 · 每组 300 个 + 长高操`}
+                </span>
+              </span>
+              <span className={`task-action ${done ? 'done' : ''}`}>
+                {done ? '已完成' : '去打卡'}
+                {!done && <ChevronRight size={15} />}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       <SectionTitle title="快捷入口" />

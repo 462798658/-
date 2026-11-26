@@ -1594,6 +1594,26 @@ p {
   color: var(--sky);
 }
 
+.task-icon.words {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.task-icon.accumulation {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.task-icon.recitation {
+  background: var(--sky-soft);
+  color: var(--sky);
+}
+
+.task-icon.rope {
+  background: var(--mint-soft);
+  color: var(--mint);
+}
+
 .task-body {
   flex: 1;
   min-width: 0;
