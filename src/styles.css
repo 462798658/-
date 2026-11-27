@@ -6493,3 +6493,86 @@ p {
   border-radius: 999px;
   padding: 3px 8px;
 }
+
+/* ---------- 账户调整 ---------- */
+.member-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin: 6px 0 14px;
+}
+
+.member-summary > div {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.member-summary span {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.member-summary b {
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.adjust-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.adjust-log {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.adjust-log-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.adjust-log-main b {
+  font-size: 12.5px;
+}
+
+.adjust-log-main span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.adjust-log-delta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.adjust-log-delta em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.adjust-log-delta em.up {
+  color: var(--primary);
+}
+
+.adjust-log-delta em.down {
+  color: var(--coral);
+}

@@ -201,6 +201,7 @@ export function createSeedState() {
       points: 0,
       streakDays: 0,
       totalDays: 0,
+      daysAdjust: 0,
       totalPages: 0,
       lastCheckinDate: null,
       createdAt: isoAt(shiftKey(today, -120), 9, 0),
@@ -217,6 +218,7 @@ export function createSeedState() {
       points: balance,
       streakDays: HISTORY_DAYS,
       totalDays: HISTORY_DAYS,
+      daysAdjust: 0,
       totalPages: HISTORY_DAYS * 2,
       lastCheckinDate: shiftKey(today, -1),
       createdAt: isoAt(shiftKey(today, -40), 9, 0),
@@ -263,5 +265,6 @@ export function createSeedState() {
     addresses,
     logistics,
     unlocks,
+    adjustLogs: [],
   }
 }

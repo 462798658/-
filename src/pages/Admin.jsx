@@ -23,6 +23,7 @@ import {
   Target,
   Trash2,
   Truck,
+  UserCog,
   X,
 } from 'lucide-react'
 import { useApp } from '../state/AppContext'
@@ -36,6 +37,7 @@ const TABS = [
   { value: 'reading', label: '阅读打卡' },
   { value: 'calc', label: '计算打卡' },
   { value: 'extra', label: '拓展打卡' },
+  { value: 'members', label: '账户调整' },
   { value: 'gift', label: '礼品管理' },
   { value: 'review', label: '兑换审核' },
 ]
@@ -88,6 +90,7 @@ export default function Admin() {
     saveReadingConfig,
     saveCalcConfig,
     saveExtraConfig,
+    adjustUser,
     reviewOrder,
     completeOrder,
     toast,
@@ -138,6 +141,12 @@ export default function Admin() {
   const [extraTab, setExtraTab] = useState('words')
   const [extraForms, setExtraForms] = useState(() => buildExtraForms(state.extraConfig))
   const [extraError, setExtraError] = useState('')
+
+  const [memberId, setMemberId] = useState(() => state.users.find((u) => u.role !== 'admin')?.id || '')
+  const [adjustPoints, setAdjustPoints] = useState('')
+  const [adjustDays, setAdjustDays] = useState('')
+  const [adjustReason, setAdjustReason] = useState('')
+  const [adjustError, setAdjustError] = useState('')
 
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejectRemark, setRejectRemark] = useState('')
@@ -408,6 +417,29 @@ export default function Admin() {
     setExtraError('')
     const meta = extraFeatureMeta(key)
     toast(`${meta.name}配置已保存，学员端实时生效`, 'success')
+  }
+
+  const submitAdjust = () => {
+    const target = state.users.find((u) => u.id === memberId) || state.users.find((u) => u.role !== 'admin')
+    if (!target) {
+      setAdjustError('暂无可调整的学员账户')
+      return
+    }
+    const res = adjustUser({
+      userId: target.id,
+      pointsDelta: adjustPoints,
+      daysDelta: adjustDays,
+      reason: adjustReason,
+    })
+    if (!res.ok) {
+      setAdjustError(res.message)
+      return
+    }
+    setAdjustError('')
+    setAdjustPoints('')
+    setAdjustDays('')
+    setAdjustReason('')
+    toast(`已调整「${target.nickname}」的账户，学员端实时生效`, 'success')
   }
 
   const handleApprove = (order) => {
@@ -832,6 +864,154 @@ export default function Admin() {
             <button className="btn btn-primary full" onClick={() => submitExtra(extraTab)}>
               保存{eMeta.name}配置
             </button>
+          </div>
+        )
+      })() : null}
+
+      {tab === 'members' ? (() => {
+        const members = state.users.filter((u) => u.role !== 'admin')
+        const member = state.users.find((u) => u.id === memberId) || members[0]
+        const pv = Number(adjustPoints || 0)
+        const dv = Number(adjustDays || 0)
+        const nextPoints = member ? member.points + (Number.isFinite(pv) ? pv : 0) : 0
+        const nextDays = member ? member.totalDays + (Number.isFinite(dv) ? dv : 0) : 0
+        const logs = (state.adjustLogs || []).filter((l) => l.userId === member?.id).slice(0, 5)
+        return (
+          <div className="admin-panel">
+            <div className="admin-panel-head">
+              <div>
+                <h2>账户调整</h2>
+                <p>手动调整学员积分与累计打卡天数，保存后学员端实时生效</p>
+              </div>
+              <Badge tone="amber">
+                <UserCog size={12} /> 管理员操作
+              </Badge>
+            </div>
+
+            {members.length === 0 ? (
+              <p className="admin-empty">暂无可调整的学员账户。</p>
+            ) : (
+              <>
+                <Field label="选择学员账户">
+                  <select
+                    value={member?.id || ''}
+                    onChange={(e) => {
+                      setMemberId(e.target.value)
+                      setAdjustError('')
+                    }}
+                  >
+                    {members.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nickname}（{u.account}）
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                {member ? (
+                  <div className="member-summary">
+                    <div>
+                      <span>当前积分</span>
+                      <b>{member.points}</b>
+                    </div>
+                    <div>
+                      <span>累计打卡</span>
+                      <b>{member.totalDays} 天</b>
+                    </div>
+                    <div>
+                      <span>连续打卡</span>
+                      <b>{member.streakDays} 天</b>
+                    </div>
+                    <div>
+                      <span>累计页数</span>
+                      <b>{member.totalPages} 页</b>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="gift-form-grid">
+                  <Field label="积分调整" hint="正数增加，负数扣减">
+                    <input
+                      type="number"
+                      step="1"
+                      placeholder="例如 50 或 -20"
+                      value={adjustPoints}
+                      onChange={(e) => setAdjustPoints(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="打卡天数调整" hint="正数增加，负数扣减">
+                    <input
+                      type="number"
+                      step="1"
+                      placeholder="例如 7 或 -3"
+                      value={adjustDays}
+                      onChange={(e) => setAdjustDays(e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <Field label="调整原因" hint="选填，将记录在调整日志中">
+                  <input
+                    type="text"
+                    maxLength={30}
+                    placeholder="例如：活动奖励补发"
+                    value={adjustReason}
+                    onChange={(e) => setAdjustReason(e.target.value)}
+                  />
+                </Field>
+
+                {member ? (
+                  <div className="admin-preview">
+                    <UserCog size={16} />
+                    <span>
+                      调整后：积分 <b>{Math.max(0, nextPoints)}</b> 分，累计打卡 <b>{Math.max(0, nextDays)}</b> 天
+                    </span>
+                  </div>
+                ) : null}
+
+                {adjustError ? <p className="form-error">{adjustError}</p> : null}
+
+                <button className="btn btn-primary full" onClick={submitAdjust}>
+                  保存调整
+                </button>
+
+                <div className="section-title">
+                  <div>
+                    <h2>最近调整记录</h2>
+                    <p>仅展示当前学员最近 5 条</p>
+                  </div>
+                </div>
+                {logs.length === 0 ? (
+                  <p className="admin-empty">暂无调整记录。</p>
+                ) : (
+                  <div className="adjust-log-list">
+                    {logs.map((l) => (
+                      <div key={l.id} className="adjust-log">
+                        <div className="adjust-log-main">
+                          <b>{l.reason || '管理员调整'}</b>
+                          <span>
+                            {formatDateTime(l.createdAt)} · 调整后 积分 {l.pointsAfter} / 打卡 {l.daysAfter} 天
+                          </span>
+                        </div>
+                        <div className="adjust-log-delta">
+                          {l.pointsDelta !== 0 ? (
+                            <em className={l.pointsDelta > 0 ? 'up' : 'down'}>
+                              {l.pointsDelta > 0 ? '+' : ''}
+                              {l.pointsDelta} 分
+                            </em>
+                          ) : null}
+                          {l.daysDelta !== 0 ? (
+                            <em className={l.daysDelta > 0 ? 'up' : 'down'}>
+                              {l.daysDelta > 0 ? '+' : ''}
+                              {l.daysDelta} 天
+                            </em>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )
       })() : null}

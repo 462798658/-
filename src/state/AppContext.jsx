@@ -40,10 +40,12 @@ function loadState() {
         parsed.gifts = (parsed.gifts || []).map((gift) => ({ ...gift, isOnShelf: gift.isOnShelf !== false }))
         parsed.users = (parsed.users || []).map((u) => ({
           ...u,
+          daysAdjust: Number.isInteger(u.daysAdjust) ? u.daysAdjust : 0,
           account:
             u.account ||
             (u.phone === '13800000000' ? 'admin' : u.phone === '13812345678' ? 'student' : u.phone || u.id),
         }))
+        parsed.adjustLogs = parsed.adjustLogs || []
         return parsed
       }
     }
@@ -82,7 +84,7 @@ function recomputeProgress(draft, userId) {
   const calcDates = draft.calcCheckins.filter((c) => c.userId === userId).map((c) => c.date)
   const extraDates = (draft.extraCheckins || []).filter((c) => c.userId === userId).map((c) => c.date)
   const allDates = [...new Set([...readingDates, ...calcDates, ...extraDates])].sort()
-  user.totalDays = allDates.length
+  user.totalDays = Math.max(0, allDates.length + (user.daysAdjust || 0))
   user.totalPages = draft.calcCheckins
     .filter((c) => c.userId === userId)
     .reduce((sum, c) => sum + (c.pages || 1), 0)
@@ -207,6 +209,7 @@ export function AppProvider({ children }) {
           points: 0,
           streakDays: 0,
           totalDays: 0,
+          daysAdjust: 0,
           totalPages: 0,
           lastCheckinDate: null,
           createdAt: nowISO(),
@@ -525,6 +528,44 @@ export function AppProvider({ children }) {
     }
     draft.extraConfig = { ...draft.extraConfig, [feature]: next, updatedAt: nowISO() }
     setState(draft)
+    return { ok: true }
+  }
+
+  // ---------- 账户调整（管理员） ----------
+  const adjustUser = ({ userId, pointsDelta, daysDelta, reason }) => {
+    if (!user || user.role !== 'admin') return { ok: false, message: '无权限调整账户' }
+    const target = state.users.find((u) => u.id === userId)
+    if (!target) return { ok: false, message: '学员不存在' }
+    const p = Number(pointsDelta || 0)
+    const d = Number(daysDelta || 0)
+    if (!Number.isInteger(p)) return { ok: false, message: '积分调整需为整数' }
+    if (!Number.isInteger(d)) return { ok: false, message: '打卡天数调整需为整数' }
+    if (p === 0 && d === 0) return { ok: false, message: '请填写积分或打卡天数的调整值' }
+    if (target.points + p < 0) {
+      return { ok: false, message: `调整后积分不能为负数（当前 ${target.points} 分）` }
+    }
+    if (target.totalDays + d < 0) {
+      return { ok: false, message: `调整后累计打卡不能为负数（当前 ${target.totalDays} 天）` }
+    }
+    const draft = structuredClone(state)
+    const t = draft.users.find((u) => u.id === userId)
+    t.daysAdjust = (t.daysAdjust || 0) + d
+    if (p !== 0) addPoints(draft, userId, p, 'adjust', reason?.trim() ? reason.trim().slice(0, 30) : '管理员调整积分')
+    const unlocks = recomputeProgress(draft, userId)
+    draft.adjustLogs = draft.adjustLogs || []
+    draft.adjustLogs.unshift({
+      id: uid('adj'),
+      userId,
+      adminId: user.id,
+      pointsDelta: p,
+      daysDelta: d,
+      reason: (reason || '').trim().slice(0, 30),
+      pointsAfter: t.points,
+      daysAfter: t.totalDays,
+      createdAt: nowISO(),
+    })
+    setState(draft)
+    notifyUnlocks(unlocks)
     return { ok: true }
   }
 
@@ -1010,6 +1051,7 @@ export function AppProvider({ children }) {
     completeExtra,
     claimExtraReward,
     saveExtraConfig,
+    adjustUser,
     isExtraUnlocked,
     extraPagesTotal,
     extraTodayRecords,
